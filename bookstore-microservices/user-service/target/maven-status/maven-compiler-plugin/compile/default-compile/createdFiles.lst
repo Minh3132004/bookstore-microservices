@@ -1,0 +1,17 @@
+com\bookstore\user\dto\response\UserResponse$UserResponseBuilder.class
+com\bookstore\user\entity\User$UserBuilder.class
+com\bookstore\user\repository\UserRepository.class
+com\bookstore\user\service\CloudinaryService.class
+com\bookstore\user\dto\request\UpdateProfileRequest.class
+com\bookstore\user\dto\response\ApiResponse$ApiResponseBuilder.class
+com\bookstore\user\exception\GlobalExceptionHandler.class
+com\bookstore\user\service\UserService.class
+com\bookstore\user\controller\UserController.class
+com\bookstore\user\entity\User.class
+com\bookstore\user\dto\response\UserResponse.class
+com\bookstore\user\util\Base64ToMultipartFile.class
+com\bookstore\user\dto\request\ChangeAvatarRequest.class
+com\bookstore\user\dto\response\ApiResponse.class
+com\bookstore\user\dto\request\ChangePasswordRequest.class
+com\bookstore\user\config\CloudinaryConfig.class
+com\bookstore\user\UserServiceApplication.class

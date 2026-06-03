@@ -1,0 +1,2 @@
+com\bookstore\gateway\filter\JwtAuthFilter.class
+com\bookstore\gateway\GatewayApplication.class
