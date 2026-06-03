@@ -5,21 +5,33 @@ import 'package:get/get.dart' hide MultipartFile, FormData;
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../books/controllers/book_controller.dart';
 import '../controllers/admin_controller.dart';
 import '../../../core/models/book_model.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 
-class BookManagementScreen extends StatelessWidget {
+class BookManagementScreen extends StatefulWidget {
   const BookManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final bookController = Get.put(BookController());
-    final adminController = Get.put(AdminController());
-    adminController.fetchGenres();
+  State<BookManagementScreen> createState() => _BookManagementScreenState();
+}
 
+class _BookManagementScreenState extends State<BookManagementScreen> {
+  final bookController = Get.put(BookController());
+  final adminController = Get.put(AdminController());
+
+  @override
+  void initState() {
+    super.initState();
+    adminController.fetchGenres();
+    bookController.fetchBooksForAdmin(reset: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý sách')),
       floatingActionButton: FloatingActionButton(
@@ -27,41 +39,81 @@ class BookManagementScreen extends StatelessWidget {
         child: const Icon(Icons.add),
       ),
       body: Obx(() {
-        if (bookController.isLoading.value) {
+        if (bookController.adminLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
-        return ListView.builder(
-          itemCount: bookController.books.length,
-          itemBuilder: (ctx, i) {
-            final book = bookController.books[i];
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.book, size: 40),
-                title: Text(book.nameBook),
-                subtitle: Text('${book.sellPrice.toStringAsFixed(0)}đ • SL: ${book.quantity}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+        if (bookController.adminBooks.isEmpty) {
+          return const Center(child: Text('Chưa có sách nào.'));
+        }
+        return Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: bookController.adminBooks.length,
+                itemBuilder: (ctx, i) {
+                  final book = bookController.adminBooks[i];
+                  return Card(
+                    child: ListTile(
+                      leading: SizedBox(
+                        width: 40,
+                        height: 56,
+                        child: book.thumbnailUrl != null
+                            ? CachedNetworkImage(
+                                imageUrl: book.thumbnailUrl!,
+                                fit: BoxFit.cover,
+                                errorWidget: (c, u, e) => const Icon(Icons.book),
+                              )
+                            : const Icon(Icons.book, size: 40),
+                      ),
+                      title: Text(book.nameBook),
+                      subtitle:
+                          Text('${book.sellPrice.toStringAsFixed(0)}đ • SL: ${book.quantity}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => Get.to(() =>
+                                BookFormScreen(bookController: bookController, book: book)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _confirmDelete(book.idBook),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Obx(() => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => Get.to(() =>
-                          BookFormScreen(bookController: bookController, book: book)),
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: bookController.adminPage.value > 0
+                          ? bookController.adminPrevPage
+                          : null,
                     ),
+                    Text(
+                        'Trang ${bookController.adminPage.value + 1} / ${bookController.adminTotalPages.value}'),
                     IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmDelete(bookController, book.idBook),
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: bookController.adminPage.value <
+                              bookController.adminTotalPages.value - 1
+                          ? bookController.adminNextPage
+                          : null,
                     ),
                   ],
-                ),
-              ),
-            );
-          },
+                )),
+          ],
         );
       }),
     );
   }
 
-  void _confirmDelete(BookController controller, int id) {
+  void _confirmDelete(int id) {
     Get.dialog(AlertDialog(
       title: const Text('Xác nhận xóa'),
       content: const Text('Bạn có chắc muốn xóa sách này?'),
@@ -73,7 +125,7 @@ class BookManagementScreen extends StatelessWidget {
             try {
               await DioClient.instance.delete(ApiEndpoints.bookById(id));
               Get.back();
-              controller.fetchBooks(reset: true);
+              bookController.fetchBooksForAdmin();
               Get.snackbar('Thành công', 'Đã xóa sách');
             } on DioException catch (e) {
               Get.back();
@@ -111,6 +163,9 @@ class _BookFormScreenState extends State<BookFormScreen> {
 
   final List<int> _selectedGenreIds = [];
   final List<XFile> _newImages = [];
+  // Ảnh cũ: idImage -> urlImage; _keepImageIds = ảnh muốn giữ lại khi lưu.
+  final Map<int, String> _existingImages = {};
+  final Set<int> _keepImageIds = {};
   bool _isSaving = false;
 
   bool get _isEdit => widget.book != null;
@@ -127,6 +182,16 @@ class _BookFormScreenState extends State<BookFormScreen> {
     _discountCtrl = TextEditingController(text: b?.discountPercent.toString() ?? '0');
     if (b?.genres != null) {
       _selectedGenreIds.addAll((b!.genres!).map((g) => g['idGenre'] as int));
+    }
+    if (b?.images != null) {
+      for (final img in b!.images!) {
+        final id = img['idImage'] as int?;
+        final url = img['urlImage'] as String?;
+        if (id != null && url != null) {
+          _existingImages[id] = url;
+          _keepImageIds.add(id); // mặc định giữ tất cả
+        }
+      }
     }
   }
 
@@ -173,12 +238,17 @@ class _BookFormScreenState extends State<BookFormScreen> {
       }
 
       if (_isEdit) {
-        await _dio.put(ApiEndpoints.bookById(widget.book!.idBook), data: formData);
+        // Gửi keepImageIds (query) để backend giữ/xóa ảnh cũ tương ứng.
+        await _dio.put(
+          ApiEndpoints.bookById(widget.book!.idBook),
+          data: formData,
+          queryParameters: {'keepImageIds': _keepImageIds.toList()},
+        );
       } else {
         await _dio.post(ApiEndpoints.books, data: formData);
       }
 
-      widget.bookController.fetchBooks(reset: true);
+      widget.bookController.fetchBooksForAdmin();
       Get.back();
       Get.snackbar('Thành công', _isEdit ? 'Đã cập nhật sách' : 'Đã tạo sách');
     } on DioException catch (e) {
@@ -231,9 +301,62 @@ class _BookFormScreenState extends State<BookFormScreen> {
                     }).toList(),
                   )),
               const SizedBox(height: 16),
+              // Ảnh hiện có (chỉ khi sửa) — bỏ chọn để xóa khi lưu.
+              if (_existingImages.isNotEmpty) ...[
+                const Text('Ảnh hiện có (bỏ chọn để xóa)',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 90,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: _existingImages.entries.map((entry) {
+                      final keep = _keepImageIds.contains(entry.key);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            Opacity(
+                              opacity: keep ? 1 : 0.35,
+                              child: CachedNetworkImage(
+                                imageUrl: entry.value,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                                errorWidget: (c, u, e) => const Icon(Icons.book, size: 40),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  if (keep) {
+                                    _keepImageIds.remove(entry.key);
+                                  } else {
+                                    _keepImageIds.add(entry.key);
+                                  }
+                                }),
+                                child: CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: keep ? Colors.red : Colors.green,
+                                  child: Icon(keep ? Icons.close : Icons.add,
+                                      size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Row(
                 children: [
-                  const Text('Ảnh', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(_isEdit ? 'Thêm ảnh mới' : 'Ảnh',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: _pickImages,

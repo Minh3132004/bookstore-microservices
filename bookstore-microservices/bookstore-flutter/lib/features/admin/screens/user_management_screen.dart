@@ -27,7 +27,14 @@ class UserManagementScreen extends StatelessWidget {
               child: ListTile(
                 leading: CircleAvatar(child: Text('${user['idUser']}')),
                 title: Text('${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'.trim()),
-                subtitle: Text(user['email'] ?? ''),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user['email'] ?? ''),
+                    if ((user['phoneNumber'] ?? '').toString().isNotEmpty)
+                      Text('SĐT: ${user['phoneNumber']}'),
+                  ],
+                ),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () => _showEditDialog(controller, user),
@@ -44,16 +51,23 @@ class UserManagementScreen extends StatelessWidget {
     final firstName = TextEditingController(text: user['firstName'] ?? '');
     final lastName = TextEditingController(text: user['lastName'] ?? '');
     final phone = TextEditingController(text: user['phoneNumber'] ?? '');
+    final address = TextEditingController(text: user['deliveryAddress'] ?? '');
 
     Get.dialog(AlertDialog(
       title: const Text('Sửa người dùng'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: firstName, decoration: const InputDecoration(labelText: 'Họ đệm')),
-          TextField(controller: lastName, decoration: const InputDecoration(labelText: 'Tên')),
-          TextField(controller: phone, decoration: const InputDecoration(labelText: 'SĐT')),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: firstName, decoration: const InputDecoration(labelText: 'Họ đệm')),
+            TextField(controller: lastName, decoration: const InputDecoration(labelText: 'Tên')),
+            TextField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'SĐT')),
+            TextField(controller: address, decoration: const InputDecoration(labelText: 'Địa chỉ')),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('Huỷ')),
@@ -63,10 +77,11 @@ class UserManagementScreen extends StatelessWidget {
               'firstName': firstName.text.trim(),
               'lastName': lastName.text.trim(),
               'phoneNumber': phone.text.trim(),
+              'deliveryAddress': address.text.trim(),
             });
             Get.back();
-            Get.snackbar(success ? 'Thành công' : 'Lỗi',
-                success ? 'Cập nhật thành công' : 'Cập nhật thất bại');
+            // Lỗi đã được controller hiển thị snackbar; ở đây chỉ báo thành công.
+            if (success) Get.snackbar('Thành công', 'Cập nhật thành công');
           },
           child: const Text('Lưu'),
         ),

@@ -1,6 +1,5 @@
 package com.bookstore.book.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -56,7 +55,8 @@ public class Book {
             inverseJoinColumns = @JoinColumn(name = "id_genre"))
     private List<Genre> genres;
 
-    @JsonIgnore
+    // R1: exposed in JSON (Image.book keeps @JsonIgnore so no serialization cycle).
+    // OSIV (default) lets the LAZY collection serialize, consistent with genres above.
     @OneToMany(mappedBy = "book", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<Image> images;
 }

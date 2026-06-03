@@ -1,108 +1,196 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/book_controller.dart';
+import '../../../shared/widgets/book_card.dart';
+import '../../../shared/widgets/shimmer_loading.dart';
 
-class ProductsScreen extends StatelessWidget {
+class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(BookController());
+  State<ProductsScreen> createState() => _ProductsScreenState();
+}
 
+class _ProductsScreenState extends State<ProductsScreen> {
+  final controller = Get.put(BookController());
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      controller.search(value, genreId: controller.selectedGenreId.value);
+    });
+  }
+
+  // Grid responsive: web/màn rộng nhiều cột, mobile ~2 cột (maxCrossAxisExtent 180).
+  static const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 190,
+    mainAxisExtent: 312,
+    crossAxisSpacing: 14,
+    mainAxisSpacing: 18,
+  );
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sách'),
+        title: const Text('Khám phá sách'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: const Size.fromHeight(64),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              onSubmitted: (v) => controller.search(v),
-              decoration: InputDecoration(
-                hintText: 'Tìm kiếm sách...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                prefixIcon: const Icon(Icons.search),
+              onChanged: _onSearchChanged,
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                hintText: 'Tìm theo tên sách...',
+                prefixIcon: Icon(Icons.search),
               ),
             ),
           ),
         ),
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (controller.books.isEmpty) {
-          return const Center(child: Text('Không tìm thấy sách nào.'));
-        }
-        return Column(
-          children: [
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.65,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: controller.books.length,
-                itemBuilder: (ctx, i) => _BookCard(book: controller.books[i]),
-              ),
-            ),
-            _Pagination(controller: controller),
-          ],
-        );
-      }),
+      body: Column(
+        children: [
+          _GenreFilter(controller: controller),
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value && controller.books.isEmpty) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: _gridDelegate,
+                  itemCount: 6,
+                  itemBuilder: (_, __) => const BookCardSkeleton(),
+                );
+              }
+              if (controller.errorMessage.value.isNotEmpty && controller.books.isEmpty) {
+                return _ErrorState(
+                  message: controller.errorMessage.value,
+                  onRetry: () => controller.fetchBooks(reset: true),
+                );
+              }
+              if (controller.books.isEmpty) {
+                return const _EmptyState();
+              }
+              return Column(
+                children: [
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: _gridDelegate,
+                      itemCount: controller.books.length,
+                      itemBuilder: (ctx, i) => BookCard(book: controller.books[i]),
+                    ),
+                  ),
+                  _Pagination(controller: controller),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _BookCard extends StatelessWidget {
-  final dynamic book;
-  const _BookCard({required this.book});
+class _GenreFilter extends StatelessWidget {
+  final BookController controller;
+  const _GenreFilter({required this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Get.toNamed('/book-detail', arguments: book.idBook),
-      child: Card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Obx(() {
+      if (controller.genres.isEmpty) return const SizedBox.shrink();
+      return SizedBox(
+        height: 52,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           children: [
-            Expanded(
-              child: book.thumbnailUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: book.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      placeholder: (c, u) => const Center(child: CircularProgressIndicator()),
-                      errorWidget: (c, u, e) => const Icon(Icons.book, size: 60),
-                    )
-                  : const Center(child: Icon(Icons.book, size: 60)),
+            _chip(
+              label: 'Tất cả',
+              selected: controller.selectedGenreId.value == null,
+              onTap: () {
+                controller.selectedGenreId.value = null;
+                controller.fetchBooks(reset: true);
+              },
             ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(book.nameBook,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text('${book.sellPrice.toStringAsFixed(0)}đ',
-                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                  if (book.discountPercent > 0)
-                    Text('-${book.discountPercent}%',
-                        style: const TextStyle(color: Colors.green, fontSize: 12)),
-                ],
-              ),
-            ),
+            ...controller.genres.map((g) {
+              final id = g['idGenre'] as int;
+              return _chip(
+                label: g['nameGenre'] ?? '',
+                selected: controller.selectedGenreId.value == id,
+                onTap: () {
+                  controller.selectedGenreId.value =
+                      controller.selectedGenreId.value == id ? null : id;
+                  controller.fetchBooks(reset: true);
+                },
+              );
+            }),
           ],
         ),
+      );
+    });
+  }
+
+  Widget _chip({required String label, required bool selected, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off, size: 64, color: theme.colorScheme.outline),
+          const SizedBox(height: 12),
+          Text('Không tìm thấy sách nào', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text('Thử từ khoá hoặc thể loại khác.', style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off, size: 64, color: theme.colorScheme.outline),
+          const SizedBox(height: 12),
+          Text(message, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          OutlinedButton(onPressed: onRetry, child: const Text('Thử lại')),
+        ],
       ),
     );
   }
@@ -114,21 +202,28 @@ class _Pagination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() => Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: controller.currentPage.value > 0 ? controller.prevPage : null,
-        ),
-        Text('Trang ${controller.currentPage.value + 1} / ${controller.totalPages.value}'),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: controller.currentPage.value < controller.totalPages.value - 1
-              ? controller.nextPage
-              : null,
-        ),
-      ],
-    ));
+    return Obx(() => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton.filledTonal(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: controller.currentPage.value > 0 ? controller.prevPage : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                    'Trang ${controller.currentPage.value + 1} / ${controller.totalPages.value}'),
+              ),
+              IconButton.filledTonal(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: controller.currentPage.value < controller.totalPages.value - 1
+                    ? controller.nextPage
+                    : null,
+              ),
+            ],
+          ),
+        ));
   }
 }

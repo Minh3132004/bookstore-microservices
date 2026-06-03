@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/favorite_controller.dart';
-import '../../../core/models/book_model.dart';
-import '../../../core/network/dio_client.dart';
-import '../../../core/network/api_endpoints.dart';
 
 class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({super.key});
@@ -20,69 +17,57 @@ class FavoritesScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (controller.favorites.isEmpty) {
-          return const Center(child: Text('Chưa có sách yêu thích nào.'));
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.favorite_border, size: 56, color: Colors.grey),
+                const SizedBox(height: 12),
+                const Text('Chưa có sách yêu thích nào.'),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => Get.toNamed('/products'),
+                  child: const Text('Khám phá sách'),
+                ),
+              ],
+            ),
+          );
         }
         return ListView.builder(
           itemCount: controller.favorites.length,
           itemBuilder: (ctx, i) {
             final fav = controller.favorites[i];
             final bookId = fav['bookId'] as int;
-            return _FavoriteTile(
-              bookId: bookId,
-              onRemove: () => controller.removeFavorite(bookId),
+            final book = controller.bookFor(bookId);
+            return Card(
+              child: ListTile(
+                leading: SizedBox(
+                  width: 44,
+                  height: 60,
+                  child: book?.thumbnailUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: book!.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (c, u) =>
+                              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          errorWidget: (c, u, e) => const Icon(Icons.book, size: 40),
+                        )
+                      : const Icon(Icons.book, size: 40),
+                ),
+                title: Text(book?.nameBook ?? 'Sách #$bookId'),
+                subtitle: book != null
+                    ? Text('${book.sellPrice.toStringAsFixed(0)}đ')
+                    : null,
+                trailing: IconButton(
+                  icon: const Icon(Icons.favorite, color: Colors.red),
+                  onPressed: () => controller.removeFavorite(bookId),
+                ),
+                onTap: () => Get.toNamed('/book-detail', arguments: bookId),
+              ),
             );
           },
         );
       }),
-    );
-  }
-}
-
-class _FavoriteTile extends StatefulWidget {
-  final int bookId;
-  final VoidCallback onRemove;
-
-  const _FavoriteTile({required this.bookId, required this.onRemove});
-
-  @override
-  State<_FavoriteTile> createState() => _FavoriteTileState();
-}
-
-class _FavoriteTileState extends State<_FavoriteTile> {
-  BookModel? _book;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBook();
-  }
-
-  Future<void> _loadBook() async {
-    try {
-      final resp = await DioClient.instance.get(ApiEndpoints.bookById(widget.bookId));
-      if (resp.data['success'] == true && mounted) {
-        setState(() => _book = BookModel.fromJson(resp.data['data']));
-      }
-    } on DioException {
-      // ignore
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.book, size: 40),
-        title: Text(_book?.nameBook ?? 'Đang tải... (ID: ${widget.bookId})'),
-        subtitle: _book != null
-            ? Text('${_book!.sellPrice.toStringAsFixed(0)}đ')
-            : null,
-        trailing: IconButton(
-          icon: const Icon(Icons.favorite, color: Colors.red),
-          onPressed: widget.onRemove,
-        ),
-        onTap: () => Get.toNamed('/book-detail', arguments: widget.bookId),
-      ),
     );
   }
 }

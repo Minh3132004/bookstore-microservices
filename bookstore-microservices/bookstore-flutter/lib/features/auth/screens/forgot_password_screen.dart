@@ -46,11 +46,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _onSubmit() async {
-    if (_emailCtrl.text.trim().isEmpty) return;
-    final success = await _authController.forgotPassword(_emailCtrl.text.trim());
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      Get.snackbar('Lỗi', 'Vui lòng nhập email');
+      return;
+    }
+    if (!email.contains('@')) {
+      Get.snackbar('Lỗi', 'Email không hợp lệ');
+      return;
+    }
+    final success = await _authController.forgotPassword(email);
     if (success) {
       Get.snackbar('Thành công', 'Mật khẩu tạm thời đã được gửi đến email của bạn!');
-      Get.toNamed('/login');
+      Get.offAllNamed('/login');
+    } else {
+      Get.snackbar('Lỗi', _authController.errorMessage.value);
     }
   }
 

@@ -6,6 +6,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../cart/controllers/cart_controller.dart';
 import '../../orders/controllers/order_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/custom_button.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -31,12 +32,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   int? _selectedPaymentId;
   final _couponCtrl = TextEditingController();
   int _discountPercent = 0;
+  bool _loadingProfile = true;
 
   @override
   void initState() {
     super.initState();
     _loadPaymentMethods();
-    _prefillProfile();
+    _initProfile();
   }
 
   Future<void> _loadPaymentMethods() async {
@@ -50,7 +52,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }
         });
       }
-    } catch (_) {}
+    } on DioException {
+      Get.snackbar('Lỗi', 'Không tải được phương thức thanh toán');
+    }
+  }
+
+  /// Tải profile (nếu chưa có) rồi điền sẵn thông tin giao hàng — tránh race khi user null.
+  Future<void> _initProfile() async {
+    if (_profileController.user.value == null) {
+      await _profileController.fetchProfile();
+    }
+    if (!mounted) return;
+    _prefillProfile();
+    setState(() => _loadingProfile = false);
   }
 
   void _prefillProfile() {
@@ -93,6 +107,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const Text('Thông tin giao hàng',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
+              if (_loadingProfile)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Đang tải thông tin giao hàng…'),
+                    ],
+                  ),
+                ),
               _field(_fullNameCtrl, 'Họ và tên', Icons.person),
               const SizedBox(height: 12),
               _field(_phoneCtrl, 'Số điện thoại', Icons.phone,
@@ -151,12 +179,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildTotalSection() {
     final subtotal = _calcSubtotal();
     final discount = subtotal * _discountPercent / 100;
-    final total = subtotal - discount;
+    final total = subtotal - discount + AppConstants.shippingFee;
     return Column(
       children: [
         _row('Tạm tính', '${subtotal.toStringAsFixed(0)}đ'),
         if (_discountPercent > 0)
           _row('Giảm giá ($_discountPercent%)', '-${discount.toStringAsFixed(0)}đ'),
+        _row('Phí giao hàng', '${AppConstants.shippingFee.toStringAsFixed(0)}đ'),
         const Divider(),
         _row('Tổng cộng', '${total.toStringAsFixed(0)}đ', bold: true),
       ],
@@ -177,10 +206,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // Lưu ý: giá sách thực tế cần lấy từ book-service; ở đây tạm tính theo cart (demo).
-  double _calcSubtotal() {
-    return _cartController.cartItems.fold(0.0, (sum, item) => sum + item.quantity * 0);
-  }
+  // Tạm tính lấy từ giỏ đã làm giàu (giá × SL). Server tính lại tổng cuối (R3).
+  double _calcSubtotal() => _cartController.totalPrice;
 
   Future<void> _onPlaceOrder() async {
     if (!_formKey.currentState!.validate()) return;
@@ -190,13 +217,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final subtotal = _calcSubtotal();
-    final total = subtotal - (subtotal * _discountPercent / 100);
+    final total = subtotal - (subtotal * _discountPercent / 100) + AppConstants.shippingFee;
 
     final orderItems = _cartController.cartItems
         .map((item) => {'bookId': item.bookId, 'quantity': item.quantity})
         .toList();
 
-    final success = await _orderController.createOrder(
+    final order = await _orderController.createOrder(
       deliveryAddress: _addressCtrl.text.trim(),
       phoneNumber: _phoneCtrl.text.trim(),
       fullName: _fullNameCtrl.text.trim(),
@@ -208,16 +235,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       orderItems: orderItems,
     );
 
-    if (success) {
-      // Đánh dấu coupon đã dùng nếu có
+    if (order != null) {
+      // Đánh dấu coupon đã dùng nếu có (báo lỗi rõ, không nuốt lỗi).
       if (_couponCtrl.text.trim().isNotEmpty && _discountPercent > 0) {
         try {
           await _dio.put(ApiEndpoints.couponUse,
               queryParameters: {'code': _couponCtrl.text.trim()});
-        } catch (_) {}
+        } on DioException catch (e) {
+          Get.snackbar('Lưu ý', e.response?.data?['message'] ?? 'Không thể ghi nhận mã giảm giá');
+        }
       }
       _cartController.fetchCart();
-      Get.offNamed('/payment-success');
+      // Dùng tổng server tính (order.totalPrice) cho màn xác nhận.
+      Get.offNamed('/payment-success', arguments: {
+        'orderId': order.idOrder,
+        'totalPrice': order.totalPrice,
+      });
     } else {
       Get.snackbar('Lỗi', _orderController.errorMessage.value);
     }

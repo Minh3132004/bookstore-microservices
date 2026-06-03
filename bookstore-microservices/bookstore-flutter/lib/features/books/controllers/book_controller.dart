@@ -8,18 +8,27 @@ class BookController extends GetxController {
   final _dio = DioClient.instance;
 
   final books = <BookModel>[].obs;
+  final bestsellers = <BookModel>[].obs;
   final genres = <dynamic>[].obs;
   final isLoading = false.obs;
+  final errorMessage = ''.obs;
   final currentPage = 0.obs;
   final totalPages = 1.obs;
   final searchName = ''.obs;
   final selectedGenreId = RxnInt();
+
+  // Admin dùng list/paging riêng (size lớn hơn), không dùng chung customer search.
+  final adminBooks = <BookModel>[].obs;
+  final adminPage = 0.obs;
+  final adminTotalPages = 1.obs;
+  final adminLoading = false.obs;
 
   @override
   void onInit() {
     super.onInit();
     fetchBooks();
     fetchGenres();
+    fetchBestsellers();
   }
 
   Future<void> fetchBooks({bool reset = false}) async {
@@ -28,6 +37,7 @@ class BookController extends GetxController {
       books.clear();
     }
     isLoading.value = true;
+    errorMessage.value = '';
     try {
       final response = await _dio.get(ApiEndpoints.bookSearch, queryParameters: {
         if (searchName.isNotEmpty) 'name': searchName.value,
@@ -43,9 +53,27 @@ class BookController extends GetxController {
         totalPages.value = pageData['totalPages'] ?? 1;
       }
     } on DioException catch (e) {
-      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể tải sách');
+      errorMessage.value = e.response?.data?['message'] ?? 'Không thể tải sách';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Sách bán chạy: sắp theo soldQuantity giảm dần (dùng endpoint /books có sort).
+  Future<void> fetchBestsellers({int size = 5}) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.books, queryParameters: {
+        'page': 0,
+        'size': size,
+        'sort': 'soldQuantity',
+      });
+      final body = response.data;
+      if (body['success'] == true) {
+        final content = body['data']['content'] as List;
+        bestsellers.assignAll(content.map((e) => BookModel.fromJson(e)).toList());
+      }
+    } on DioException {
+      // Không chặn home nếu lỗi; danh sách trống sẽ hiển thị empty state.
     }
   }
 
@@ -55,7 +83,9 @@ class BookController extends GetxController {
       if (response.data['success'] == true) {
         genres.assignAll(response.data['data'] as List);
       }
-    } catch (_) {}
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể tải thể loại');
+    }
   }
 
   Future<BookModel?> getBookById(int id) async {
@@ -64,7 +94,9 @@ class BookController extends GetxController {
       if (response.data['success'] == true) {
         return BookModel.fromJson(response.data['data']);
       }
-    } catch (_) {}
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể tải thông tin sách');
+    }
     return null;
   }
 
@@ -85,6 +117,44 @@ class BookController extends GetxController {
     if (currentPage.value > 0) {
       currentPage.value--;
       fetchBooks();
+    }
+  }
+
+  // ---- Admin ----
+  Future<void> fetchBooksForAdmin({bool reset = false, int size = 20}) async {
+    if (reset) adminPage.value = 0;
+    adminLoading.value = true;
+    try {
+      final response = await _dio.get(ApiEndpoints.books, queryParameters: {
+        'page': adminPage.value,
+        'size': size,
+        'sort': 'idBook',
+      });
+      final body = response.data;
+      if (body['success'] == true) {
+        final pageData = body['data'];
+        final content = pageData['content'] as List;
+        adminBooks.assignAll(content.map((e) => BookModel.fromJson(e)).toList());
+        adminTotalPages.value = pageData['totalPages'] ?? 1;
+      }
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể tải sách');
+    } finally {
+      adminLoading.value = false;
+    }
+  }
+
+  void adminNextPage() {
+    if (adminPage.value < adminTotalPages.value - 1) {
+      adminPage.value++;
+      fetchBooksForAdmin();
+    }
+  }
+
+  void adminPrevPage() {
+    if (adminPage.value > 0) {
+      adminPage.value--;
+      fetchBooksForAdmin();
     }
   }
 }

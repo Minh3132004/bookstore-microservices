@@ -1,6 +1,5 @@
 package com.bookstore.order.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -64,7 +63,8 @@ public class Order {
     @Column(name = "id_delivery")
     private int deliveryId;
 
-    @JsonIgnore
+    // R2: exposed in JSON (OrderDetail.order keeps @JsonIgnore so no serialization cycle).
+    // OSIV (default) lets the LAZY collection serialize on getOrder*/getAllOrders.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderDetail> listOrderDetails;
 }

@@ -2,12 +2,14 @@ import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/models/book_model.dart';
 import '../../../core/storage/token_storage.dart';
 
 class FavoriteController extends GetxController {
   final _dio = DioClient.instance;
 
   final favorites = <dynamic>[].obs; // danh sách FavoriteBook {idFavorite, userId, bookId}
+  final _books = <int, BookModel>{}.obs; // bookId -> BookModel (tải sẵn, tránh N+1)
   final isLoading = false.obs;
 
   @override
@@ -15,6 +17,8 @@ class FavoriteController extends GetxController {
     super.onInit();
     fetchFavorites();
   }
+
+  BookModel? bookFor(int bookId) => _books[bookId];
 
   Future<void> fetchFavorites() async {
     final userId = await TokenStorage.getUserId();
@@ -24,12 +28,39 @@ class FavoriteController extends GetxController {
       final response = await _dio.get(ApiEndpoints.favoritesByUser(userId));
       if (response.data['success'] == true) {
         favorites.assignAll(response.data['data'] as List);
+        await _loadBooks();
       }
     } on DioException {
       Get.snackbar('Lỗi', 'Không thể tải danh sách yêu thích');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Tải song song thông tin sách cho các bookId chưa có (1 lượt Future.wait).
+  Future<void> _loadBooks() async {
+    final missing = favorites
+        .map((f) => f['bookId'] as int)
+        .toSet()
+        .where((id) => !_books.containsKey(id))
+        .toList();
+    if (missing.isEmpty) {
+      _books.refresh();
+      return;
+    }
+    final results = await Future.wait(missing.map((id) async {
+      try {
+        final resp = await _dio.get(ApiEndpoints.bookById(id));
+        if (resp.data['success'] == true) return BookModel.fromJson(resp.data['data']);
+      } on DioException {
+        // Bỏ qua sách lỗi.
+      }
+      return null;
+    }));
+    for (final book in results) {
+      if (book != null) _books[book.idBook] = book;
+    }
+    _books.refresh();
   }
 
   bool isFavorite(int bookId) {
@@ -52,7 +83,9 @@ class FavoriteController extends GetxController {
     try {
       await _dio.delete(ApiEndpoints.removeFavorite(bookId, userId));
       favorites.removeWhere((f) => f['bookId'] == bookId);
-    } catch (_) {}
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể xóa khỏi yêu thích');
+    }
   }
 
   Future<void> toggleFavorite(int bookId) async {

@@ -24,7 +24,9 @@ import 'features/admin/screens/genre_management_screen.dart';
 import 'features/admin/screens/order_management_screen.dart';
 import 'features/admin/screens/coupon_management_screen.dart';
 import 'features/admin/screens/feedback_management_screen.dart';
+import 'features/admin/widgets/admin_route_guard.dart';
 import 'shared/theme/app_theme.dart';
+import 'shared/theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,10 +38,16 @@ class BookStoreApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ThemeController áp dụng theme qua Get.changeThemeMode (KHÔNG bọc app trong Obx
+    // để tránh rebuild toàn bộ Navigator khi đổi theme).
+    Get.put(ThemeController(), permanent: true);
     return GetMaterialApp(
       title: 'BookStore',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
+      defaultTransition: Transition.fadeIn,
       initialBinding: BindingsBuilder(() {
         Get.put(AuthController());
       }),
@@ -61,14 +69,14 @@ class BookStoreApp extends StatelessWidget {
         GetPage(name: '/profile', page: () => const ProfileScreen()),
         GetPage(name: '/favorites', page: () => const FavoritesScreen()),
         GetPage(name: '/feedback', page: () => const FeedbackScreen()),
-        // Admin
-        GetPage(name: '/admin', page: () => const AdminDashboardScreen()),
-        GetPage(name: '/admin/users', page: () => const UserManagementScreen()),
-        GetPage(name: '/admin/books', page: () => const BookManagementScreen()),
-        GetPage(name: '/admin/genres', page: () => const GenreManagementScreen()),
-        GetPage(name: '/admin/orders', page: () => const OrderManagementScreen()),
-        GetPage(name: '/admin/coupons', page: () => const CouponManagementScreen()),
-        GetPage(name: '/admin/feedbacks', page: () => const FeedbackManagementScreen()),
+        // Admin (mọi route bọc AdminGuard — chặn khách truy cập)
+        GetPage(name: '/admin', page: () => const AdminGuard(child: AdminDashboardScreen())),
+        GetPage(name: '/admin/users', page: () => const AdminGuard(child: UserManagementScreen())),
+        GetPage(name: '/admin/books', page: () => const AdminGuard(child: BookManagementScreen())),
+        GetPage(name: '/admin/genres', page: () => const AdminGuard(child: GenreManagementScreen())),
+        GetPage(name: '/admin/orders', page: () => const AdminGuard(child: OrderManagementScreen())),
+        GetPage(name: '/admin/coupons', page: () => const AdminGuard(child: CouponManagementScreen())),
+        GetPage(name: '/admin/feedbacks', page: () => const AdminGuard(child: FeedbackManagementScreen())),
       ],
       home: const _SplashRouter(),
     );
@@ -90,11 +98,16 @@ class _SplashRouterState extends State<_SplashRouter> {
   }
 
   Future<void> _checkAuth() async {
-    final token = await TokenStorage.getToken();
-    if (token != null && token.isNotEmpty) {
-      final role = await TokenStorage.getUserRole();
-      Get.offAllNamed(role == 'ADMIN' ? '/admin' : '/home');
-    } else {
+    try {
+      final token = await TokenStorage.getToken();
+      if (token != null && token.isNotEmpty) {
+        // Dùng chung logic điều hướng với màn Login.
+        await Get.find<AuthController>().navigateAfterAuth();
+      } else {
+        Get.offAllNamed('/login');
+      }
+    } catch (e) {
+      // Lỗi đọc secure storage → đưa về login thay vì kẹt ở splash.
       Get.offAllNamed('/login');
     }
   }

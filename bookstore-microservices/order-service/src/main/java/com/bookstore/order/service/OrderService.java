@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -51,26 +52,36 @@ public class OrderService {
             return ApiResponse.error("Danh sách sản phẩm không được trống!");
         }
 
-        // Kiểm tra tồn kho trước
+        // R3/R4: kiểm tra tồn kho + tính tiền server-side. Giá lấy từ book-service (sellPrice),
+        // không tin totals client gửi lên. Lưu lại từng book để tái dùng khi tạo OrderDetail.
+        Map<Integer, BookDTO> bookCache = new HashMap<>();
+        double totalPriceProduct = 0;
         for (CreateOrderRequest.OrderItemRequest item : request.getOrderItems()) {
+            BookDTO book;
             try {
-                BookDTO book = bookClient.getBookById(item.getBookId());
-                // BookClient trả về ApiResponse, cần unwrap data
-                if (book == null) {
-                    return ApiResponse.error("Không tìm thấy sách ID: " + item.getBookId());
-                }
-                if (book.getQuantity() < item.getQuantity()) {
-                    return ApiResponse.error("Sách '" + book.getNameBook() + "' không đủ số lượng!");
-                }
+                ApiResponse<BookDTO> resp = bookClient.getBookById(item.getBookId());
+                book = resp != null ? resp.getData() : null;
             } catch (Exception e) {
-                log.error("Error checking book stock: {}", e.getMessage());
+                log.error("Error checking book stock for bookId={}: {}", item.getBookId(), e.getMessage());
                 return ApiResponse.error("Không thể kiểm tra tồn kho: " + e.getMessage());
             }
+            if (book == null) {
+                return ApiResponse.error("Không tìm thấy sách ID: " + item.getBookId());
+            }
+            if (item.getQuantity() <= 0) {
+                return ApiResponse.error("Số lượng sách '" + book.getNameBook() + "' không hợp lệ!");
+            }
+            if (book.getQuantity() < item.getQuantity()) {
+                return ApiResponse.error("Sách '" + book.getNameBook() + "' không đủ số lượng!");
+            }
+            bookCache.put(item.getBookId(), book);
+            totalPriceProduct += book.getSellPrice() * item.getQuantity();
         }
 
         // Lấy phương thức giao hàng (mặc định id=1)
         Delivery delivery = deliveryRepository.findById(1).orElse(null);
         double feeDelivery = delivery != null ? delivery.getFeeDelivery() : 0;
+        double totalPrice = totalPriceProduct + feeDelivery;
 
         Order order = Order.builder()
                 .userId(userId)
@@ -79,10 +90,10 @@ public class OrderService {
                 .phoneNumber(request.getPhoneNumber())
                 .fullName(request.getFullName())
                 .note(request.getNote())
-                .totalPriceProduct(request.getTotalPriceProduct())
+                .totalPriceProduct(totalPriceProduct)
                 .feeDelivery(feeDelivery)
                 .feePayment(0)
-                .totalPrice(request.getTotalPrice())
+                .totalPrice(totalPrice)
                 .status("Đang xử lý")
                 .paymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "PENDING")
                 .paymentId(request.getPaymentId())
@@ -91,9 +102,9 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Trừ kho và tạo OrderDetail
+        // Trừ kho và tạo OrderDetail (giá đã chốt từ book-service)
         for (CreateOrderRequest.OrderItemRequest item : request.getOrderItems()) {
-            BookDTO book = bookClient.getBookById(item.getBookId());
+            BookDTO book = bookCache.get(item.getBookId());
             bookClient.updateStock(item.getBookId(), Map.of("delta", -item.getQuantity()));
 
             OrderDetail detail = OrderDetail.builder()

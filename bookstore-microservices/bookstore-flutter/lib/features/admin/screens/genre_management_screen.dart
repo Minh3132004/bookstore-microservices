@@ -36,7 +36,7 @@ class GenreManagementScreen extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => controller.deleteGenre(genre['idGenre']),
+                      onPressed: () => _confirmDelete(controller, genre['idGenre']),
                     ),
                   ],
                 ),
@@ -68,10 +68,29 @@ class GenreManagementScreen extends StatelessWidget {
                 ? await controller.updateGenre(genre['idGenre'], name)
                 : await controller.createGenre(name);
             Get.back();
-            Get.snackbar(success ? 'Thành công' : 'Lỗi',
-                success ? 'Đã lưu' : 'Thất bại');
+            // Lỗi đã được controller báo; chỉ thông báo khi thành công.
+            if (success) Get.snackbar('Thành công', 'Đã lưu');
           },
           child: const Text('Lưu'),
+        ),
+      ],
+    ));
+  }
+
+  void _confirmDelete(AdminController controller, int id) {
+    Get.dialog(AlertDialog(
+      title: const Text('Xác nhận xóa'),
+      content: const Text('Bạn có chắc muốn xóa thể loại này?'),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text('Huỷ')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () async {
+            final ok = await controller.deleteGenre(id);
+            Get.back();
+            if (ok) Get.snackbar('Thành công', 'Đã xóa thể loại');
+          },
+          child: const Text('Xóa'),
         ),
       ],
     ));

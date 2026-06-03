@@ -58,7 +58,8 @@ class ProfileController extends GetxController {
     if (userId == null) return false;
     try {
       final bytes = await imageFile.readAsBytes();
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final mime = _detectImageMime(imageFile.path, bytes);
+      final base64Image = 'data:$mime;base64,${base64Encode(bytes)}';
       final response = await _dio.put(ApiEndpoints.userAvatar(userId),
           data: {'avatar': base64Image});
       if (response.data['success'] == true) {
@@ -66,8 +67,22 @@ class ProfileController extends GetxController {
         return true;
       }
       return false;
-    } catch (_) {
+    } on DioException catch (e) {
+      errorMessage.value = e.response?.data?['message'] ?? 'Đổi avatar thất bại';
       return false;
     }
+  }
+
+  /// Phát hiện mime ảnh từ magic bytes (PNG vs JPEG), mặc định jpeg.
+  String _detectImageMime(String path, List<int> bytes) {
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (path.toLowerCase().endsWith('.png')) return 'image/png';
+    return 'image/jpeg';
   }
 }

@@ -23,10 +23,10 @@ class AuthController extends GetxController {
         final token = body['data']['token'];
         await TokenStorage.saveToken(token);
 
-        // Giải mã JWT để lấy userId và role
+        // Giải mã JWT để lấy userId và role (ép kiểu an toàn để không crash)
         final payload = _decodeJwt(token);
-        final userId = payload['id'] as int;
-        final role = payload['role'] as String;
+        final userId = (payload['id'] as num?)?.toInt() ?? 0;
+        final role = payload['role']?.toString() ?? 'USER';
         await TokenStorage.saveUserInfo(userId, role);
 
         return true;
@@ -68,12 +68,16 @@ class AuthController extends GetxController {
 
   Future<bool> forgotPassword(String email) async {
     isLoading.value = true;
+    errorMessage.value = '';
     try {
       final response = await _dio.put(ApiEndpoints.forgotPassword,
           data: {'email': email});
       final body = response.data;
-      return body['success'] == true;
-    } on DioException {
+      if (body['success'] == true) return true;
+      errorMessage.value = body['message'] ?? 'Không thể gửi mật khẩu tạm';
+      return false;
+    } on DioException catch (e) {
+      errorMessage.value = e.response?.data?['message'] ?? 'Email không tồn tại hoặc lỗi kết nối';
       return false;
     } finally {
       isLoading.value = false;
@@ -83,6 +87,13 @@ class AuthController extends GetxController {
   Future<void> logout() async {
     await TokenStorage.clearAll();
     Get.offAllNamed('/login');
+  }
+
+  /// Điều hướng sau khi xác thực: ADMIN → /admin, còn lại → /home.
+  /// Dùng chung ở Login và Splash để tránh lệch logic.
+  Future<void> navigateAfterAuth() async {
+    final role = await TokenStorage.getUserRole();
+    Get.offAllNamed(role == 'ADMIN' ? '/admin' : '/home');
   }
 
   Map<String, dynamic> _decodeJwt(String token) {

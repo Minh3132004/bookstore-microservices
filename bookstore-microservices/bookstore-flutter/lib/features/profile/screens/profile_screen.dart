@@ -31,7 +31,23 @@ class ProfileScreen extends StatelessWidget {
         }
         final user = controller.user.value;
         if (user == null) {
-          return const Center(child: Text('Không tải được thông tin'));
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 56, color: Colors.grey),
+                const SizedBox(height: 12),
+                Text(controller.errorMessage.value.isNotEmpty
+                    ? controller.errorMessage.value
+                    : 'Không tải được thông tin'),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: controller.fetchProfile,
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
+          );
         }
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -68,9 +84,10 @@ class ProfileScreen extends StatelessWidget {
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               Text(user.email, style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
-              _infoTile(Icons.phone, 'Số điện thoại', user.phoneNumber ?? 'Chưa cập nhật'),
-              _infoTile(Icons.location_on, 'Địa chỉ', user.deliveryAddress ?? 'Chưa cập nhật'),
-              _infoTile(Icons.cake, 'Ngày sinh', user.dateOfBirth ?? 'Chưa cập nhật'),
+              _infoTile(Icons.phone, 'Số điện thoại', _orDefault(user.phoneNumber)),
+              _infoTile(Icons.location_on, 'Địa chỉ', _orDefault(user.deliveryAddress)),
+              _infoTile(Icons.cake, 'Ngày sinh', _orDefault(user.dateOfBirth)),
+              _infoTile(Icons.wc, 'Giới tính', _genderLabel(user.gender)),
               const SizedBox(height: 16),
               CustomButton(
                 text: 'Chỉnh sửa thông tin',
@@ -108,6 +125,21 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  String _orDefault(String? v) => (v != null && v.isNotEmpty) ? v : 'Chưa cập nhật';
+
+  // Backend lưu giới tính 1 ký tự ('M'/'F'); hiển thị tiếng Việt.
+  String _genderLabel(String? g) {
+    if (g == null || g.isEmpty) return 'Chưa cập nhật';
+    switch (g.toUpperCase()) {
+      case 'M':
+        return 'Nam';
+      case 'F':
+        return 'Nữ';
+      default:
+        return g;
+    }
+  }
+
   Future<void> _pickAvatar(ProfileController controller) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
@@ -123,37 +155,88 @@ class ProfileScreen extends StatelessWidget {
     final lastNameCtrl = TextEditingController(text: user.lastName ?? '');
     final phoneCtrl = TextEditingController(text: user.phoneNumber ?? '');
     final addressCtrl = TextEditingController(text: user.deliveryAddress ?? '');
+    String? dateOfBirth = (user.dateOfBirth != null && (user.dateOfBirth as String).isNotEmpty)
+        ? (user.dateOfBirth as String).substring(0, 10)
+        : null;
+    String? gender = (user.gender != null && (user.gender as String).isNotEmpty)
+        ? (user.gender as String).toUpperCase()
+        : null;
 
-    Get.dialog(AlertDialog(
-      title: const Text('Chỉnh sửa thông tin'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: firstNameCtrl, decoration: const InputDecoration(labelText: 'Họ đệm')),
-            TextField(controller: lastNameCtrl, decoration: const InputDecoration(labelText: 'Tên')),
-            TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'SĐT')),
-            TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Địa chỉ')),
-          ],
+    Get.dialog(StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        title: const Text('Chỉnh sửa thông tin'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: firstNameCtrl, decoration: const InputDecoration(labelText: 'Họ đệm')),
+              TextField(controller: lastNameCtrl, decoration: const InputDecoration(labelText: 'Tên')),
+              TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'SĐT')),
+              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Địa chỉ')),
+              const SizedBox(height: 12),
+              // Ngày sinh
+              InkWell(
+                onTap: () async {
+                  final initial = dateOfBirth != null
+                      ? DateTime.tryParse(dateOfBirth!) ?? DateTime(2000)
+                      : DateTime(2000);
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: initial,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setState(() => dateOfBirth =
+                        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}');
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'Ngày sinh'),
+                  child: Text(dateOfBirth ?? 'Chọn ngày sinh'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Giới tính
+              DropdownButtonFormField<String>(
+                value: gender,
+                decoration: const InputDecoration(labelText: 'Giới tính'),
+                items: const [
+                  DropdownMenuItem(value: 'M', child: Text('Nam')),
+                  DropdownMenuItem(value: 'F', child: Text('Nữ')),
+                ],
+                onChanged: (v) => setState(() => gender = v),
+              ),
+            ],
+          ),
         ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Huỷ')),
+          ElevatedButton(
+            onPressed: () async {
+              final success = await controller.updateProfile({
+                'firstName': firstNameCtrl.text.trim(),
+                'lastName': lastNameCtrl.text.trim(),
+                'phoneNumber': phoneCtrl.text.trim(),
+                'deliveryAddress': addressCtrl.text.trim(),
+                if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
+                if (gender != null) 'gender': gender,
+              });
+              Get.back();
+              Get.snackbar(success ? 'Thành công' : 'Lỗi',
+                  success
+                      ? 'Cập nhật thành công!'
+                      : (controller.errorMessage.value.isNotEmpty
+                          ? controller.errorMessage.value
+                          : 'Cập nhật thất bại'));
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Huỷ')),
-        ElevatedButton(
-          onPressed: () async {
-            final success = await controller.updateProfile({
-              'firstName': firstNameCtrl.text.trim(),
-              'lastName': lastNameCtrl.text.trim(),
-              'phoneNumber': phoneCtrl.text.trim(),
-              'deliveryAddress': addressCtrl.text.trim(),
-            });
-            Get.back();
-            Get.snackbar(success ? 'Thành công' : 'Lỗi',
-                success ? 'Cập nhật thành công!' : 'Cập nhật thất bại');
-          },
-          child: const Text('Lưu'),
-        ),
-      ],
     ));
   }
 }

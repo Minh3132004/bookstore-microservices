@@ -102,8 +102,11 @@ public class BookService {
         applyBookUpdates(book, request, genres);
         bookRepository.save(book);
 
-        if (newImages != null && !newImages.isEmpty()) {
-            handleImageUpdates(book, keepImageIds, newImages);
+        // Áp dụng thay đổi ảnh khi có ảnh mới HOẶC khi client gửi keepImageIds
+        // (để hỗ trợ xóa ảnh cũ mà không cần upload ảnh mới).
+        boolean hasNewImages = newImages != null && !newImages.isEmpty();
+        if (hasNewImages || keepImageIds != null) {
+            handleImageUpdates(book, keepImageIds, newImages != null ? newImages : List.of());
         }
 
         return ApiResponse.success("Cập nhật sách thành công!", book);

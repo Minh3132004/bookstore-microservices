@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/order_controller.dart';
 import '../../../core/models/order_model.dart';
+import '../../../core/models/book_model.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 
@@ -17,6 +19,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final _orderController = Get.put(OrderController());
   OrderModel? _order;
   bool _isLoading = true;
+  final Map<int, BookModel> _books = {};
 
   @override
   void initState() {
@@ -27,11 +30,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _load() async {
     final orderId = Get.arguments as int;
     final order = await _orderController.getOrderById(orderId);
+    if (order != null) {
+      await _loadBooks(order);
+    }
     if (mounted) {
       setState(() {
         _order = order;
         _isLoading = false;
       });
+    }
+  }
+
+  /// Tải tên + ảnh cho từng dòng sách (song song) để hiển thị thay cho "Sách ID".
+  Future<void> _loadBooks(OrderModel order) async {
+    final details = order.listOrderDetails ?? [];
+    final ids = details.map((d) => d['bookId'] as int).toSet().toList();
+    final results = await Future.wait(ids.map((id) async {
+      try {
+        final resp = await DioClient.instance.get(ApiEndpoints.bookById(id));
+        if (resp.data['success'] == true) return BookModel.fromJson(resp.data['data']);
+      } on DioException {
+        // Bỏ qua, dòng vẫn hiển thị mã sách.
+      }
+      return null;
+    }));
+    for (final book in results) {
+      if (book != null) _books[book.idBook] = book;
     }
   }
 
@@ -94,6 +118,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               });
               Get.back();
               Get.snackbar('Thành công', 'Đã gửi đánh giá!');
+              _load(); // refresh để ẩn nút đánh giá đã gửi
             } on DioException catch (e) {
               Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Gửi đánh giá thất bại');
             }
@@ -133,19 +158,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ]),
           const SizedBox(height: 16),
           const Text('Sản phẩm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ...details.map((d) => Card(
-                child: ListTile(
-                  leading: const Icon(Icons.book),
-                  title: Text('Sách ID: ${d['bookId']}'),
-                  subtitle: Text('SL: ${d['quantity']} × ${(d['price'] ?? 0).toStringAsFixed(0)}đ'),
-                  trailing: (order.status == 'Hoàn thành' && d['reviewed'] != true)
-                      ? TextButton(
-                          onPressed: () => _writeReview(d['bookId'], d['idOrderDetail']),
-                          child: const Text('Đánh giá'),
+          ...details.map((d) {
+            final book = _books[d['bookId']];
+            return Card(
+              child: ListTile(
+                leading: SizedBox(
+                  width: 44,
+                  height: 60,
+                  child: book?.thumbnailUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: book!.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (c, u) =>
+                              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          errorWidget: (c, u, e) => const Icon(Icons.book),
                         )
-                      : null,
+                      : const Icon(Icons.book),
                 ),
-              )),
+                title: Text(book?.nameBook ?? 'Sách #${d['bookId']}'),
+                subtitle: Text('SL: ${d['quantity']} × ${(d['price'] ?? 0).toStringAsFixed(0)}đ'),
+                trailing: (order.status == 'Hoàn thành' && d['reviewed'] != true)
+                    ? TextButton(
+                        onPressed: () => _writeReview(d['bookId'], d['idOrderDetail']),
+                        child: const Text('Đánh giá'),
+                      )
+                    : null,
+              ),
+            );
+          }),
           const Divider(height: 32),
           _row('Tạm tính', '${order.totalPriceProduct.toStringAsFixed(0)}đ'),
           _row('Phí giao hàng', '${order.feeDelivery.toStringAsFixed(0)}đ'),

@@ -35,12 +35,16 @@ class OrderController extends GetxController {
       if (response.data['success'] == true) {
         return OrderModel.fromJson(response.data['data']);
       }
-    } catch (_) {}
+    } on DioException catch (e) {
+      errorMessage.value = e.response?.data?['message'] ?? 'Không thể tải chi tiết đơn';
+    }
     return null;
   }
 
-  /// Tạo đơn hàng. orderItems = [{bookId, quantity}, ...]
-  Future<bool> createOrder({
+  /// Tạo đơn hàng. orderItems = [{bookId, quantity}, ...].
+  /// Trả về OrderModel server tạo (tổng tiền do server tính lại theo R3) hoặc null nếu lỗi.
+  /// Lưu ý: totalPriceProduct/totalPrice gửi lên chỉ để tham khảo; server không tin số này.
+  Future<OrderModel?> createOrder({
     required String deliveryAddress,
     required String phoneNumber,
     required String fullName,
@@ -65,12 +69,14 @@ class OrderController extends GetxController {
         'note': note,
         'orderItems': orderItems,
       });
-      if (response.data['success'] == true) return true;
+      if (response.data['success'] == true) {
+        return OrderModel.fromJson(response.data['data']);
+      }
       errorMessage.value = response.data['message'] ?? 'Đặt hàng thất bại';
-      return false;
+      return null;
     } on DioException catch (e) {
       errorMessage.value = e.response?.data?['message'] ?? 'Lỗi kết nối';
-      return false;
+      return null;
     } finally {
       isLoading.value = false;
     }
@@ -83,8 +89,10 @@ class OrderController extends GetxController {
         await fetchMyOrders();
         return true;
       }
+      errorMessage.value = response.data['message'] ?? 'Không thể hủy đơn hàng';
       return false;
-    } catch (_) {
+    } on DioException catch (e) {
+      errorMessage.value = e.response?.data?['message'] ?? 'Không thể hủy đơn hàng';
       return false;
     }
   }
