@@ -97,8 +97,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _lastNameCtrl.text.trim(),
     );
     if (success) {
-      Get.snackbar('Thành công', 'Đăng ký thành công! Kiểm tra email để kích hoạt tài khoản.');
-      Get.toNamed('/login');
+      Get.snackbar('Thành công', 'Đăng ký thành công! Vui lòng nhập mã OTP đã được gửi đến email của bạn.');
+      Get.toNamed('/active-account', arguments: {'email': _emailCtrl.text.trim()});
     }
   }
 

@@ -74,7 +74,7 @@ Sau khi hệ thống Backend đã chạy xanh mượt trên Docker, bạn mở m
    ```
 3. Khởi chạy ứng dụng trên Chrome **đúng cổng 3000** (bắt buộc để tránh lỗi CORS):
    ```bash
-   C:\Users\ASUS\AppData\Local\Android\Sdk\emulator\emulator.exe -avd Pixel_4
+   & "C:\Users\Minh\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd Pixel_6a
    flutter run -d emulator-5554
    ```
 

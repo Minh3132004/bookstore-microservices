@@ -20,12 +20,12 @@ public class EmailService {
     private String mailFrom;
 
     @Async
-    public void sendActivationEmail(String toEmail, String activationCode, String frontendUrl) {
-        String url = frontendUrl + "/#/active-account?email=" + toEmail + "&code=" + activationCode;
-        String subject = "Kích hoạt tài khoản BookStore";
-        String body = "Cảm ơn bạn đã đăng ký! Vui lòng kích hoạt tài khoản:<br/>"
-                + "<a href='" + url + "'>Nhấn vào đây để kích hoạt</a><br/>"
-                + "Hoặc nhập mã: <strong>" + activationCode + "</strong>";
+    public void sendActivationEmail(String toEmail, String activationCode) {
+        String subject = "Kích hoạt tài khoản BookStore - Mã OTP";
+        String body = "<h3>Cảm ơn bạn đã đăng ký BookStore!</h3>"
+                + "<p>Mã OTP kích hoạt tài khoản của bạn là:</p>"
+                + "<h2 style='color: #4F46E5; font-size: 24px; letter-spacing: 2px;'>" + activationCode + "</h2>"
+                + "<p>Vui lòng nhập mã này trên ứng dụng để hoàn tất việc đăng ký.</p>";
         sendHtmlEmail(toEmail, subject, body);
     }
 

@@ -61,7 +61,7 @@ public class AuthService {
             log.warn("Could not init user profile for userId={}: {}", authUser.getId(), e.getMessage());
         }
 
-        emailService.sendActivationEmail(authUser.getEmail(), authUser.getActivationCode(), frontendUrl);
+        emailService.sendActivationEmail(authUser.getEmail(), authUser.getActivationCode());
         return ApiResponse.success("Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt tài khoản.");
     }
 
@@ -87,7 +87,7 @@ public class AuthService {
             log.warn("Could not init user profile: {}", e.getMessage());
         }
 
-        emailService.sendActivationEmail(authUser.getEmail(), authUser.getActivationCode(), frontendUrl);
+        emailService.sendActivationEmail(authUser.getEmail(), authUser.getActivationCode());
         return ApiResponse.success("Người dùng được tạo thành công! Email xác nhận đã được gửi.");
     }
 
@@ -97,7 +97,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(rawPassword))
                 .email(email)
                 .enabled(false)
-                .activationCode(UUID.randomUUID().toString())
+                .activationCode(RandomStringUtils.randomNumeric(6))
                 .role(role)
                 .build();
         return authUserRepository.save(authUser);

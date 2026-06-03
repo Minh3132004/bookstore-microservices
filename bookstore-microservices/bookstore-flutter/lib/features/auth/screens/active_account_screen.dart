@@ -21,28 +21,11 @@ class _ActiveAccountScreenState extends State<ActiveAccountScreen> {
   @override
   void initState() {
     super.initState();
-    // Hỗ trợ deep link: /active-account?email=...&code=...
-    // Đọc từ URL query params (khi click link từ email trên web)
-    final uri = Uri.base;
-    final emailParam = uri.queryParameters['email'];
-    final codeParam = uri.queryParameters['code'];
-
-    if (emailParam != null && emailParam.isNotEmpty) {
-      _emailCtrl.text = emailParam;
-    }
-    if (codeParam != null && codeParam.isNotEmpty) {
-      _codeCtrl.text = codeParam;
-      // Tự động kích hoạt nếu cả 2 params đều có
-      if (emailParam != null && emailParam.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _activate());
-      }
-    }
-
-    // Fallback: đọc từ GetX arguments (khi navigate nội bộ)
+    // Đọc từ GetX arguments khi chuyển hướng từ màn hình đăng ký
     final args = Get.arguments;
     if (args is Map) {
-      if (_emailCtrl.text.isEmpty) _emailCtrl.text = args['email'] ?? '';
-      if (_codeCtrl.text.isEmpty) _codeCtrl.text = args['code'] ?? '';
+      _emailCtrl.text = args['email'] ?? '';
+      _codeCtrl.text = args['code'] ?? '';
     }
   }
 
@@ -78,21 +61,30 @@ class _ActiveAccountScreenState extends State<ActiveAccountScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const Text('Nhập email và mã kích hoạt đã gửi đến hộp thư của bạn.'),
-            const SizedBox(height: 16),
+            const Text(
+              'Nhập mã OTP 6 chữ số được gửi đến email của bạn để kích hoạt tài khoản.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                   labelText: 'Email', border: OutlineInputBorder()),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
               controller: _codeCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
               decoration: const InputDecoration(
-                  labelText: 'Mã kích hoạt', border: OutlineInputBorder()),
+                  labelText: 'Mã OTP (6 chữ số)',
+                  border: OutlineInputBorder(),
+                  counterText: ""),
             ),
             const SizedBox(height: 24),
-            CustomButton(text: 'Kích hoạt', isLoading: _isLoading, onPressed: _activate),
+            CustomButton(text: 'Xác nhận kích hoạt', isLoading: _isLoading, onPressed: _activate),
           ],
         ),
       ),
