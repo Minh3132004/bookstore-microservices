@@ -12,6 +12,7 @@ import 'features/books/screens/book_detail_screen.dart';
 import 'features/cart/screens/cart_screen.dart';
 import 'features/checkout/screens/checkout_screen.dart';
 import 'features/checkout/screens/payment_success_screen.dart';
+import 'features/checkout/screens/payos_payment_screen.dart';
 import 'features/orders/screens/orders_screen.dart';
 import 'features/orders/screens/order_detail_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
@@ -64,6 +65,7 @@ class BookStoreApp extends StatelessWidget {
         GetPage(name: '/cart', page: () => const CartScreen()),
         GetPage(name: '/checkout', page: () => const CheckoutScreen()),
         GetPage(name: '/payment-success', page: () => const PaymentSuccessScreen()),
+        GetPage(name: '/payos-payment', page: () => const PayOSPaymentScreen()),
         GetPage(name: '/orders', page: () => const OrdersScreen()),
         GetPage(name: '/order-detail', page: () => const OrderDetailScreen()),
         GetPage(name: '/profile', page: () => const ProfileScreen()),

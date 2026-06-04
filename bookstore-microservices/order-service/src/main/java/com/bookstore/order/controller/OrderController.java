@@ -54,6 +54,7 @@ public class OrderController {
     public ResponseEntity<ApiResponse<Order>> cancelOrder(@PathVariable int id) {
         UpdateOrderRequest req = new UpdateOrderRequest();
         req.setStatus("Bị huỷ");
+        req.setPaymentStatus("CANCELLED");
         ApiResponse<Order> response = orderService.updateOrderStatus(id, req);
         return response.isSuccess() ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
     }

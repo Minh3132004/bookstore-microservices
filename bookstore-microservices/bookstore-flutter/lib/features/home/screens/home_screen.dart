@@ -188,10 +188,10 @@ class _BookCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 296,
+      height: 300,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: books.length,
         separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (ctx, i) => SizedBox(

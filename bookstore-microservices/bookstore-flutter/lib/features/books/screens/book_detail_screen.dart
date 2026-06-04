@@ -57,7 +57,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   List<String> _imageUrls(BookModel book) {
     final images = book.images;
     if (images == null || images.isEmpty) return [];
-    return images.map((e) => e['urlImage'] as String?).whereType<String>().toList();
+    return images
+        .map((e) => BookModel.secureImageUrl(e['urlImage']))
+        .whereType<String>()
+        .toList();
   }
 
   @override
@@ -138,6 +141,23 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Tác giả — luôn hiển thị trong phần nội dung chính
+                  Row(
+                    children: [
+                      Icon(Icons.person_outline, size: 18, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          book.author.isNotEmpty ? book.author : 'Chưa rõ tác giả',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   // Giá + giảm giá
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,

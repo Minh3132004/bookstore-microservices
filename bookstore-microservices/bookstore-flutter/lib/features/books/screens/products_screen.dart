@@ -32,7 +32,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   // Grid responsive: web/màn rộng nhiều cột, mobile ~2 cột (maxCrossAxisExtent 180).
   static const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: 190,
-    mainAxisExtent: 312,
+    mainAxisExtent: 320,
     crossAxisSpacing: 14,
     mainAxisSpacing: 18,
   );

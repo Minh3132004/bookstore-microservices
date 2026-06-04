@@ -78,9 +78,12 @@ public class OrderService {
             totalPriceProduct += book.getSellPrice() * item.getQuantity();
         }
 
-        // Lấy phương thức giao hàng (mặc định id=1)
-        Delivery delivery = deliveryRepository.findById(1).orElse(null);
-        double feeDelivery = delivery != null ? delivery.getFeeDelivery() : 0;
+        int deliveryId = request.getDeliveryId() > 0 ? request.getDeliveryId() : 1;
+        Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
+        if (delivery == null) {
+            return ApiResponse.error("Phương thức giao hàng không hợp lệ!");
+        }
+        double feeDelivery = delivery.getFeeDelivery();
         double totalPrice = totalPriceProduct + feeDelivery;
 
         Order order = Order.builder()
@@ -97,7 +100,7 @@ public class OrderService {
                 .status("Đang xử lý")
                 .paymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "PENDING")
                 .paymentId(request.getPaymentId())
-                .deliveryId(delivery != null ? delivery.getIdDelivery() : 1)
+                .deliveryId(delivery.getIdDelivery())
                 .build();
 
         Order savedOrder = orderRepository.save(order);

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../books/controllers/book_controller.dart';
 import '../controllers/admin_controller.dart';
+import '../widgets/admin_ui.dart';
 import '../../../core/models/book_model.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -22,36 +23,73 @@ class BookManagementScreen extends StatefulWidget {
 class _BookManagementScreenState extends State<BookManagementScreen> {
   final bookController = Get.put(BookController());
   final adminController = Get.put(AdminController());
+  final _searchCtrl = TextEditingController();
+  String _keyword = '';
 
   @override
   void initState() {
     super.initState();
     adminController.fetchGenres();
     bookController.fetchBooksForAdmin(reset: true);
+    bookController.fetchAllBooksForAdminSearch();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<BookModel> _displayBooks() {
+    final searching = _keyword.trim().isNotEmpty;
+    if (!searching) return bookController.adminBooks;
+    final source = bookController.adminAllBooks.isNotEmpty
+        ? bookController.adminAllBooks
+        : bookController.adminBooks;
+    return source
+        .where((b) => adminMatchesKeyword(_keyword, [b.nameBook, b.author]))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final searching = _keyword.trim().isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý sách')),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Get.to(() => BookFormScreen(bookController: bookController)),
         child: const Icon(Icons.add),
       ),
-      body: Obx(() {
-        if (bookController.adminLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (bookController.adminBooks.isEmpty) {
-          return const Center(child: Text('Chưa có sách nào.'));
-        }
-        return Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: bookController.adminBooks.length,
+      body: Column(
+        children: [
+          AdminSearchBar(
+            controller: _searchCtrl,
+            hint: 'Tìm theo tên sách, tác giả...',
+            onChanged: (v) => setState(() => _keyword = v),
+          ),
+          if (searching)
+            Obx(() => AdminFilterResultBar(count: _displayBooks().length)),
+          Expanded(
+            child: Obx(() {
+              if (bookController.adminLoading.value && !searching) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final books = _displayBooks();
+              if (books.isEmpty) {
+                return Center(
+                  child: Text(
+                    searching
+                        ? 'Không tìm thấy sách với "$_keyword"'
+                        : 'Chưa có sách nào.',
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: books.length,
                 itemBuilder: (ctx, i) {
-                  final book = bookController.adminBooks[i];
+                  final book = books[i];
                   return Card(
                     child: ListTile(
                       leading: SizedBox(
@@ -85,8 +123,10 @@ class _BookManagementScreenState extends State<BookManagementScreen> {
                     ),
                   );
                 },
-              ),
-            ),
+              );
+            }),
+          ),
+          if (!searching)
             Obx(() => Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -107,9 +147,8 @@ class _BookManagementScreenState extends State<BookManagementScreen> {
                     ),
                   ],
                 )),
-          ],
-        );
-      }),
+        ],
+      ),
     );
   }
 
@@ -126,6 +165,7 @@ class _BookManagementScreenState extends State<BookManagementScreen> {
               await DioClient.instance.delete(ApiEndpoints.bookById(id));
               Get.back();
               bookController.fetchBooksForAdmin();
+              bookController.fetchAllBooksForAdminSearch();
               Get.snackbar('Thành công', 'Đã xóa sách');
             } on DioException catch (e) {
               Get.back();
@@ -249,6 +289,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       }
 
       widget.bookController.fetchBooksForAdmin();
+      widget.bookController.fetchAllBooksForAdminSearch();
       Get.back();
       Get.snackbar('Thành công', _isEdit ? 'Đã cập nhật sách' : 'Đã tạo sách');
     } on DioException catch (e) {

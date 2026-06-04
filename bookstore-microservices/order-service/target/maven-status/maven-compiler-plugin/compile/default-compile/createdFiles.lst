@@ -9,6 +9,7 @@ com\bookstore\order\entity\Order.class
 com\bookstore\order\dto\response\BookDTO.class
 com\bookstore\order\OrderServiceApplication.class
 com\bookstore\order\entity\Delivery.class
+com\bookstore\order\controller\DeliveryController.class
 com\bookstore\order\entity\CartItem$CartItemBuilder.class
 com\bookstore\order\entity\OrderDetail.class
 com\bookstore\order\repository\OrderDetailRepository.class

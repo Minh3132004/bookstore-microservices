@@ -52,6 +52,7 @@ class OrderController extends GetxController {
     required double totalPrice,
     required int paymentId,
     required String paymentStatus,
+    required int deliveryId,
     String? note,
     required List<Map<String, int>> orderItems,
   }) async {
@@ -66,6 +67,7 @@ class OrderController extends GetxController {
         'totalPrice': totalPrice,
         'paymentId': paymentId,
         'paymentStatus': paymentStatus,
+        'deliveryId': deliveryId,
         'note': note,
         'orderItems': orderItems,
       });

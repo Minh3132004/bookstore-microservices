@@ -44,12 +44,17 @@ class BookModel {
     );
   }
 
+  static String? secureImageUrl(dynamic url) {
+    if (url is! String || url.isEmpty) return null;
+    return url.startsWith('http://') ? url.replaceFirst('http://', 'https://') : url;
+  }
+
   String? get thumbnailUrl {
     if (images == null || images!.isEmpty) return null;
     final thumb = images!.firstWhere(
       (img) => img['thumbnail'] == true,
       orElse: () => images!.first,
     );
-    return thumb['urlImage'];
+    return secureImageUrl(thumb['urlImage']);
   }
 }

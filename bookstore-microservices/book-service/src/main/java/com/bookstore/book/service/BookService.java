@@ -2,6 +2,7 @@ package com.bookstore.book.service;
 
 import com.bookstore.book.dto.request.CreateBookRequest;
 import com.bookstore.book.dto.response.ApiResponse;
+import com.bookstore.book.dto.response.BookListDto;
 import com.bookstore.book.entity.Book;
 import com.bookstore.book.entity.Genre;
 import com.bookstore.book.entity.Image;
@@ -32,12 +33,42 @@ public class BookService {
     private final ImageRepository imageRepository;
     private final CloudinaryService cloudinaryService;
 
-    public ApiResponse<Page<Book>> getBooks(int page, int size, String sort) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sort).descending());
-        return ApiResponse.success("OK", bookRepository.findAll(pageable));
+    public ApiResponse<Page<BookListDto>> getBooks(int page, int size, String sort) {
+        Pageable pageable = PageRequest.of(page, size, parseSort(sort));
+        Page<Book> books = bookRepository.findAll(pageable);
+        initImages(books.getContent());
+        return ApiResponse.success("OK", books.map(BookListDto::from));
     }
 
-    public ApiResponse<Page<Book>> searchBooks(String name, Integer genreId, int page, int size) {
+    @Transactional
+    public ApiResponse<List<BookListDto>> getBestsellers(int size) {
+        int limit = Math.min(Math.max(size, 1), 20);
+        Pageable pageable = PageRequest.of(0, limit,
+                Sort.by(Sort.Order.desc("soldQuantity"), Sort.Order.desc("avgRating"), Sort.Order.desc("idBook")));
+        List<Book> books = bookRepository.findAll(pageable).getContent();
+        initImages(books);
+        return ApiResponse.success("OK", books.stream().map(BookListDto::from).toList());
+    }
+
+    private static void initImages(List<Book> books) {
+        books.forEach(b -> {
+            if (b.getImages() != null) {
+                b.getImages().size();
+            }
+        });
+    }
+
+    private static Sort parseSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return Sort.by(Sort.Direction.DESC, "idBook");
+        }
+        String[] parts = sort.split(",");
+        String field = parts[0].trim();
+        boolean asc = parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim());
+        return asc ? Sort.by(field).ascending() : Sort.by(field).descending();
+    }
+
+    public ApiResponse<Page<BookListDto>> searchBooks(String name, Integer genreId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Book> result;
         if (name != null && !name.isBlank() && genreId != null) {
@@ -49,7 +80,8 @@ public class BookService {
         } else {
             result = bookRepository.findAll(pageable);
         }
-        return ApiResponse.success("OK", result);
+        initImages(result.getContent());
+        return ApiResponse.success("OK", result.map(BookListDto::from));
     }
 
     public ApiResponse<Book> getBookById(int id) {

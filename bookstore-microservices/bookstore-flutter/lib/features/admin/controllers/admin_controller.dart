@@ -149,13 +149,13 @@ class AdminController extends GetxController {
   }
 
   // ----- COUPONS -----
-  Future<void> fetchCoupons({int? page}) async {
+  Future<void> fetchCoupons({int? page, int size = 10}) async {
     if (page != null) couponPage.value = page;
     isLoading.value = true;
     try {
       final resp = await _dio.get(ApiEndpoints.coupons, queryParameters: {
         'page': couponPage.value,
-        'size': 10,
+        'size': size,
       });
       if (resp.data['success'] == true) {
         final data = resp.data['data'];
@@ -212,13 +212,13 @@ class AdminController extends GetxController {
   }
 
   // ----- FEEDBACKS -----
-  Future<void> fetchFeedbacks({int? page}) async {
+  Future<void> fetchFeedbacks({int? page, int size = 10}) async {
     if (page != null) feedbackPage.value = page;
     isLoading.value = true;
     try {
       final resp = await _dio.get(ApiEndpoints.feedbacks, queryParameters: {
         'page': feedbackPage.value,
-        'size': 10,
+        'size': size,
       });
       if (resp.data['success'] == true) {
         final data = resp.data['data'];

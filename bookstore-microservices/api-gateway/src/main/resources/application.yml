@@ -37,7 +37,7 @@ spring:
         - id: order-service
           uri: ${SERVICES_ORDER_URL:http://localhost:8084}
           predicates:
-            - Path=/api/v1/orders/**,/api/v1/cart/**
+            - Path=/api/v1/orders/**,/api/v1/cart/**,/api/v1/deliveries/**
           filters:
             - StripPrefix=2
         - id: payment-service

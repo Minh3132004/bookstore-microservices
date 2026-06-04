@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
@@ -19,6 +20,8 @@ class BookController extends GetxController {
 
   // Admin dùng list/paging riêng (size lớn hơn), không dùng chung customer search.
   final adminBooks = <BookModel>[].obs;
+  /// Toàn bộ sách (dùng lọc tìm kiếm admin, giống BookStoreSBA allBooks).
+  final adminAllBooks = <BookModel>[].obs;
   final adminPage = 0.obs;
   final adminTotalPages = 1.obs;
   final adminLoading = false.obs;
@@ -59,21 +62,34 @@ class BookController extends GetxController {
     }
   }
 
-  /// Sách bán chạy: sắp theo soldQuantity giảm dần (dùng endpoint /books có sort).
+  /// Sách bán chạy: GET /books/bestsellers (soldQuantity ↓, giống BookStoreSBA).
   Future<void> fetchBestsellers({int size = 5}) async {
     try {
-      final response = await _dio.get(ApiEndpoints.books, queryParameters: {
-        'page': 0,
-        'size': size,
-        'sort': 'soldQuantity',
-      });
+      final response = await _dio.get(
+        ApiEndpoints.bookBestsellers,
+        queryParameters: {'size': size},
+      );
       final body = response.data;
-      if (body['success'] == true) {
-        final content = body['data']['content'] as List;
-        bestsellers.assignAll(content.map((e) => BookModel.fromJson(e)).toList());
+      if (body['success'] == true && body['data'] is List) {
+        final list = body['data'] as List;
+        bestsellers.assignAll(list.map((e) => BookModel.fromJson(e)).toList());
       }
-    } on DioException {
-      // Không chặn home nếu lỗi; danh sách trống sẽ hiển thị empty state.
+    } on DioException catch (e) {
+      // Fallback: sort qua /books nếu service chưa rebuild.
+      try {
+        final fallback = await _dio.get(ApiEndpoints.books, queryParameters: {
+          'page': 0,
+          'size': size,
+          'sort': 'soldQuantity,desc',
+        });
+        final fb = fallback.data;
+        if (fb['success'] == true && fb['data']?['content'] is List) {
+          final content = fb['data']['content'] as List;
+          bestsellers.assignAll(content.map((e) => BookModel.fromJson(e)).toList());
+        }
+      } on DioException {
+        debugPrint('fetchBestsellers failed: ${e.response?.data ?? e.message}');
+      }
     }
   }
 
@@ -155,6 +171,27 @@ class BookController extends GetxController {
     if (adminPage.value > 0) {
       adminPage.value--;
       fetchBooksForAdmin();
+    }
+  }
+
+  /// Nạp nhiều sách một lần để tìm kiếm theo tên/tác giả trên client.
+  Future<void> fetchAllBooksForAdminSearch() async {
+    adminLoading.value = true;
+    try {
+      final response = await _dio.get(ApiEndpoints.books, queryParameters: {
+        'page': 0,
+        'size': 500,
+        'sort': 'idBook',
+      });
+      final body = response.data;
+      if (body['success'] == true) {
+        final content = body['data']['content'] as List;
+        adminAllBooks.assignAll(content.map((e) => BookModel.fromJson(e)).toList());
+      }
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Không thể tải sách');
+    } finally {
+      adminLoading.value = false;
     }
   }
 }

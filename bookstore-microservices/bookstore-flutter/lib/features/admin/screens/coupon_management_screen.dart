@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/admin_controller.dart';
+import '../widgets/admin_ui.dart';
 import '../../../core/models/coupon_model.dart';
 
 class CouponManagementScreen extends StatefulWidget {
@@ -12,6 +13,8 @@ class CouponManagementScreen extends StatefulWidget {
 
 class _CouponManagementScreenState extends State<CouponManagementScreen> {
   final controller = Get.put(AdminController());
+  final _searchCtrl = TextEditingController();
+  String _keyword = '';
 
   @override
   void initState() {
@@ -20,32 +23,75 @@ class _CouponManagementScreenState extends State<CouponManagementScreen> {
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _keyword = value);
+    if (value.trim().isEmpty) {
+      controller.fetchCoupons(page: 0, size: 10);
+    } else {
+      controller.fetchCoupons(page: 0, size: 200);
+    }
+  }
+
+  List<dynamic> _filteredCoupons() {
+    if (_keyword.trim().isEmpty) return controller.coupons;
+    return controller.coupons.where((c) {
+      final code = (c['code'] ?? '').toString();
+      final pct = (c['discountPercent'] ?? '').toString();
+      return adminMatchesKeyword(_keyword, [code, pct]);
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final searching = _keyword.trim().isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý mã giảm giá')),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateDialog(controller),
         child: const Icon(Icons.add),
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (controller.coupons.isEmpty) {
-          return const Center(child: Text('Chưa có mã giảm giá nào.'));
-        }
-        return Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: controller.coupons.length,
+      body: Column(
+        children: [
+          AdminSearchBar(
+            controller: _searchCtrl,
+            hint: 'Tìm theo mã, % giảm...',
+            onChanged: _onSearchChanged,
+          ),
+          Obx(() {
+            if (searching) {
+              return AdminFilterResultBar(count: _filteredCoupons().length);
+            }
+            return const SizedBox.shrink();
+          }),
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final items = _filteredCoupons();
+              if (items.isEmpty) {
+                return Center(
+                  child: Text(
+                    searching
+                        ? 'Không tìm thấy mã với "$_keyword"'
+                        : 'Chưa có mã giảm giá nào.',
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: items.length,
                 itemBuilder: (ctx, i) {
-                  final c = CouponModel.fromJson(
-                      Map<String, dynamic>.from(controller.coupons[i]));
+                  final c = CouponModel.fromJson(Map<String, dynamic>.from(items[i]));
                   return Card(
                     child: ListTile(
-                      title: Text(c.code,
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(c.code, style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('Giảm ${c.discountPercent}% • HSD: ${c.expiryDate}'
                           '${c.isUsed ? ' • Đã dùng' : ''}'),
                       trailing: Row(
@@ -64,12 +110,12 @@ class _CouponManagementScreenState extends State<CouponManagementScreen> {
                     ),
                   );
                 },
-              ),
-            ),
-            _Pagination(controller: controller),
-          ],
-        );
-      }),
+              );
+            }),
+          ),
+          if (!searching) _Pagination(controller: controller),
+        ],
+      ),
     );
   }
 
@@ -81,22 +127,21 @@ class _CouponManagementScreenState extends State<CouponManagementScreen> {
 
     Get.dialog(AlertDialog(
       title: const Text('Tạo mã giảm giá'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
+      content: AdminFormFields(
         children: [
-          TextField(
+          adminDialogField(
             controller: quantityCtrl,
+            label: 'Số lượng',
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Số lượng'),
           ),
-          TextField(
+          adminDialogField(
             controller: discountCtrl,
+            label: '% giảm giá',
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '% giảm giá'),
           ),
-          TextField(
+          adminDialogField(
             controller: expiryCtrl,
-            decoration: const InputDecoration(labelText: 'Ngày hết hạn (yyyy-MM-dd)'),
+            label: 'Ngày hết hạn (yyyy-MM-dd)',
           ),
         ],
       ),

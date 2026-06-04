@@ -115,9 +115,14 @@ services:
       PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID}
       PAYOS_API_KEY: ${PAYOS_API_KEY}
       PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY}
+      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL:-https://pay.payos.vn/web/}
+      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL:-https://pay.payos.vn/web/}
+      SERVICES_ORDER_URL: http://order-service:8084
     depends_on:
       sqlserver:
         condition: service_healthy
+      order-service:
+        condition: service_started
 
   coupon-feedback-service:
     build: ./coupon-feedback-service

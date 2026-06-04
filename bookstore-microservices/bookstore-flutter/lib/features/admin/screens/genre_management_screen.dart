@@ -1,14 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/admin_controller.dart';
+import '../widgets/admin_ui.dart';
 
-class GenreManagementScreen extends StatelessWidget {
+class GenreManagementScreen extends StatefulWidget {
   const GenreManagementScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(AdminController());
+  State<GenreManagementScreen> createState() => _GenreManagementScreenState();
+}
+
+class _GenreManagementScreenState extends State<GenreManagementScreen> {
+  final controller = Get.put(AdminController());
+  final _searchCtrl = TextEditingController();
+  String _keyword = '';
+
+  @override
+  void initState() {
+    super.initState();
     controller.fetchGenres();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<dynamic> _filteredGenres() {
+    if (_keyword.trim().isEmpty) return controller.genres;
+    return controller.genres
+        .where((g) => adminMatchesKeyword(_keyword, [g['nameGenre']?.toString()]))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final searching = _keyword.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Quản lý thể loại')),
@@ -16,35 +44,59 @@ class GenreManagementScreen extends StatelessWidget {
         onPressed: () => _showDialog(controller),
         child: const Icon(Icons.add),
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return ListView.builder(
-          itemCount: controller.genres.length,
-          itemBuilder: (ctx, i) {
-            final genre = controller.genres[i];
-            return Card(
-              child: ListTile(
-                title: Text(genre['nameGenre'] ?? ''),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _showDialog(controller, genre: genre),
+      body: Column(
+        children: [
+          AdminSearchBar(
+            controller: _searchCtrl,
+            hint: 'Tìm theo tên thể loại...',
+            onChanged: (v) => setState(() => _keyword = v),
+          ),
+          if (searching)
+            Obx(() => AdminFilterResultBar(count: _filteredGenres().length)),
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final items = _filteredGenres();
+              if (items.isEmpty) {
+                return Center(
+                  child: Text(
+                    searching
+                        ? 'Không tìm thấy thể loại với "$_keyword"'
+                        : 'Chưa có thể loại nào.',
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: items.length,
+                itemBuilder: (ctx, i) {
+                  final genre = items[i];
+                  return Card(
+                    child: ListTile(
+                      title: Text(genre['nameGenre'] ?? ''),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showDialog(controller, genre: genre),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _confirmDelete(controller, genre['idGenre']),
+                          ),
+                        ],
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmDelete(controller, genre['idGenre']),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      }),
+                  );
+                },
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 
@@ -54,10 +106,7 @@ class GenreManagementScreen extends StatelessWidget {
 
     Get.dialog(AlertDialog(
       title: Text(isEdit ? 'Sửa thể loại' : 'Thêm thể loại'),
-      content: TextField(
-        controller: ctrl,
-        decoration: const InputDecoration(labelText: 'Tên thể loại'),
-      ),
+      content: adminDialogField(controller: ctrl, label: 'Tên thể loại'),
       actions: [
         TextButton(onPressed: () => Get.back(), child: const Text('Huỷ')),
         ElevatedButton(
@@ -68,7 +117,6 @@ class GenreManagementScreen extends StatelessWidget {
                 ? await controller.updateGenre(genre['idGenre'], name)
                 : await controller.createGenre(name);
             Get.back();
-            // Lỗi đã được controller báo; chỉ thông báo khi thành công.
             if (success) Get.snackbar('Thành công', 'Đã lưu');
           },
           child: const Text('Lưu'),

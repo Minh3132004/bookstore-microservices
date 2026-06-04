@@ -2,6 +2,7 @@ package com.bookstore.book.controller;
 
 import com.bookstore.book.dto.request.CreateBookRequest;
 import com.bookstore.book.dto.response.ApiResponse;
+import com.bookstore.book.dto.response.BookListDto;
 import com.bookstore.book.entity.Book;
 import com.bookstore.book.service.BookService;
 import lombok.RequiredArgsConstructor;
@@ -22,15 +23,21 @@ public class BookController {
     private final BookService bookService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<Book>>> getBooks(
+    public ResponseEntity<ApiResponse<Page<BookListDto>>> getBooks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "idBook") String sort) {
         return ResponseEntity.ok(bookService.getBooks(page, size, sort));
     }
 
+    @GetMapping("/bestsellers")
+    public ResponseEntity<ApiResponse<List<BookListDto>>> getBestsellers(
+            @RequestParam(defaultValue = "5") int size) {
+        return ResponseEntity.ok(bookService.getBestsellers(size));
+    }
+
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<Page<Book>>> searchBooks(
+    public ResponseEntity<ApiResponse<Page<BookListDto>>> searchBooks(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Integer genreId,
             @RequestParam(defaultValue = "0") int page,

@@ -41,7 +41,8 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/books",
             "/genres",
             "/reviews/book/",
-            "/coupons/validate"
+            "/coupons/validate",
+            "/deliveries"
     );
 
     @Override

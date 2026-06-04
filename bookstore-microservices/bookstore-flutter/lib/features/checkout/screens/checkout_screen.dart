@@ -3,10 +3,10 @@ import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/models/order_model.dart';
 import '../../cart/controllers/cart_controller.dart';
 import '../../orders/controllers/order_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/custom_button.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -30,30 +30,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<dynamic> _paymentMethods = [];
   int? _selectedPaymentId;
+  List<dynamic> _deliveryMethods = [];
+  int? _selectedDeliveryId;
   final _couponCtrl = TextEditingController();
   int _discountPercent = 0;
   bool _loadingProfile = true;
+  bool _loadingPayments = true;
+  String? _paymentsError;
+  bool _loadingDeliveries = true;
+  String? _deliveriesError;
 
   @override
   void initState() {
     super.initState();
     _loadPaymentMethods();
+    _loadDeliveryMethods();
     _initProfile();
   }
 
+  Future<void> _loadDeliveryMethods() async {
+    setState(() {
+      _loadingDeliveries = true;
+      _deliveriesError = null;
+    });
+    try {
+      final resp = await _dio.get(ApiEndpoints.deliveries);
+      if (resp.data['success'] == true) {
+        final list = resp.data['data'] as List;
+        setState(() {
+          _deliveryMethods = list;
+          _selectedDeliveryId =
+              list.isNotEmpty ? list.first['idDelivery'] as int? : null;
+        });
+      } else {
+        setState(() => _deliveriesError =
+            resp.data['message'] ?? 'Không tải được hình thức giao hàng');
+      }
+    } on DioException catch (e) {
+      setState(() => _deliveriesError =
+          e.response?.data?['message'] ?? 'Không tải được hình thức giao hàng');
+    } finally {
+      if (mounted) setState(() => _loadingDeliveries = false);
+    }
+  }
+
+  double get _selectedDeliveryFee {
+    if (_selectedDeliveryId == null) return 0;
+    for (final d in _deliveryMethods) {
+      if (d['idDelivery'] == _selectedDeliveryId) {
+        return (d['feeDelivery'] ?? 0).toDouble();
+      }
+    }
+    return 0;
+  }
+
   Future<void> _loadPaymentMethods() async {
+    setState(() {
+      _loadingPayments = true;
+      _paymentsError = null;
+    });
     try {
       final resp = await _dio.get(ApiEndpoints.payments);
       if (resp.data['success'] == true) {
+        final list = resp.data['data'] as List;
         setState(() {
-          _paymentMethods = resp.data['data'] as List;
-          if (_paymentMethods.isNotEmpty) {
-            _selectedPaymentId = _paymentMethods.first['idPayment'];
-          }
+          _paymentMethods = list;
+          _selectedPaymentId =
+              list.isNotEmpty ? list.first['idPayment'] as int? : null;
         });
+      } else {
+        setState(() => _paymentsError = resp.data['message'] ?? 'Không tải được phương thức thanh toán');
       }
-    } on DioException {
-      Get.snackbar('Lỗi', 'Không tải được phương thức thanh toán');
+    } on DioException catch (e) {
+      setState(() => _paymentsError =
+          e.response?.data?['message'] ?? 'Không tải được phương thức thanh toán');
+    } finally {
+      if (mounted) setState(() => _loadingPayments = false);
     }
   }
 
@@ -134,6 +186,78 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     labelText: 'Ghi chú (tuỳ chọn)', border: OutlineInputBorder()),
               ),
               const Divider(height: 32),
+              const Text('Hình thức giao hàng',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              if (_loadingDeliveries)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Đang tải hình thức giao hàng…'),
+                    ],
+                  ),
+                )
+              else if (_deliveriesError != null)
+                Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.error_outline),
+                    title: Text(_deliveriesError!),
+                    trailing: TextButton(
+                      onPressed: _loadDeliveryMethods,
+                      child: const Text('Thử lại'),
+                    ),
+                  ),
+                )
+              else if (_deliveryMethods.isEmpty)
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.local_shipping_outlined),
+                    title: Text('Chưa có hình thức giao hàng'),
+                    subtitle: Text(
+                        'Thêm dữ liệu vào bảng delivery (database db_order).'),
+                  ),
+                )
+              else
+                ..._deliveryMethods.map((d) {
+                  final id = d['idDelivery'] as int;
+                  final fee = (d['feeDelivery'] ?? 0).toDouble();
+                  final selected = _selectedDeliveryId == id;
+                  return Card(
+                    elevation: selected ? 2 : 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outlineVariant,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: RadioListTile<int>(
+                      value: id,
+                      groupValue: _selectedDeliveryId,
+                      title: Text(
+                        d['nameDelivery'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        fee > 0
+                            ? 'Phí giao hàng: ${fee.toStringAsFixed(0)}đ'
+                            : 'Miễn phí giao hàng',
+                      ),
+                      onChanged: (v) => setState(() => _selectedDeliveryId = v),
+                    ),
+                  );
+                }),
+              const Divider(height: 32),
               const Text('Mã giảm giá',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
@@ -154,13 +278,69 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const Text('Phương thức thanh toán',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
-              ..._paymentMethods.map((p) => RadioListTile<int>(
-                    value: p['idPayment'],
-                    groupValue: _selectedPaymentId,
-                    title: Text(p['namePayment'] ?? ''),
-                    subtitle: Text(p['description'] ?? ''),
-                    onChanged: (v) => setState(() => _selectedPaymentId = v),
-                  )),
+              if (_loadingPayments)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Đang tải phương thức thanh toán…'),
+                    ],
+                  ),
+                )
+              else if (_paymentsError != null)
+                Card(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.error_outline),
+                    title: Text(_paymentsError!),
+                    trailing: TextButton(
+                      onPressed: _loadPaymentMethods,
+                      child: const Text('Thử lại'),
+                    ),
+                  ),
+                )
+              else if (_paymentMethods.isEmpty)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.payment_outlined),
+                    title: const Text('Chưa có phương thức thanh toán'),
+                    subtitle: const Text(
+                        'Vui lòng thêm phương thức thanh toán trong database (bảng payment).'),
+                  ),
+                )
+              else
+                ..._paymentMethods.map((p) {
+                  final id = p['idPayment'] as int;
+                  final selected = _selectedPaymentId == id;
+                  return Card(
+                    elevation: selected ? 2 : 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outlineVariant,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: RadioListTile<int>(
+                      value: id,
+                      groupValue: _selectedPaymentId,
+                      title: Text(
+                        p['namePayment'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(p['description'] ?? ''),
+                      onChanged: (v) => setState(() => _selectedPaymentId = v),
+                    ),
+                  );
+                }),
               const Divider(height: 32),
               _buildTotalSection(),
               const SizedBox(height: 16),
@@ -179,13 +359,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildTotalSection() {
     final subtotal = _calcSubtotal();
     final discount = subtotal * _discountPercent / 100;
-    final total = subtotal - discount + AppConstants.shippingFee;
+    final shipFee = _selectedDeliveryFee;
+    final total = subtotal - discount + shipFee;
     return Column(
       children: [
         _row('Tạm tính', '${subtotal.toStringAsFixed(0)}đ'),
         if (_discountPercent > 0)
           _row('Giảm giá ($_discountPercent%)', '-${discount.toStringAsFixed(0)}đ'),
-        _row('Phí giao hàng', '${AppConstants.shippingFee.toStringAsFixed(0)}đ'),
+        _row('Phí giao hàng', '${shipFee.toStringAsFixed(0)}đ'),
         const Divider(),
         _row('Tổng cộng', '${total.toStringAsFixed(0)}đ', bold: true),
       ],
@@ -209,15 +390,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // Tạm tính lấy từ giỏ đã làm giàu (giá × SL). Server tính lại tổng cuối (R3).
   double _calcSubtotal() => _cartController.totalPrice;
 
+  bool _isPayOsSelected() {
+    for (final p in _paymentMethods) {
+      if (p['idPayment'] == _selectedPaymentId) {
+        final name = (p['namePayment'] ?? '').toString().toLowerCase();
+        return name.contains('payos');
+      }
+    }
+    return false;
+  }
+
+  /// Tạo link PayOS + mã QR VietQR (orderCode = idOrder).
+  Future<Map<String, dynamic>?> _createPayOSPayment(OrderModel order) async {
+    final user = _profileController.user.value;
+    try {
+      final resp = await _dio.post(ApiEndpoints.createPayOSLink, data: {
+        'orderCode': order.idOrder,
+        'amount': order.totalPrice.round(),
+        'description': 'Don hang #${order.idOrder}',
+        'buyerName': _fullNameCtrl.text.trim(),
+        'buyerPhone': _phoneCtrl.text.trim(),
+        'buyerEmail': user?.email ?? '',
+      });
+      if (resp.data['success'] != true) {
+        Get.snackbar('Lỗi', resp.data['message'] ?? 'Không tạo được link PayOS');
+        return null;
+      }
+      final data = resp.data['data'];
+      if (data is! Map) {
+        Get.snackbar('Lỗi', 'Phản hồi PayOS không hợp lệ');
+        return null;
+      }
+      return Map<String, dynamic>.from(data);
+    } on DioException catch (e) {
+      Get.snackbar('Lỗi', e.response?.data?['message'] ?? 'Tạo link PayOS thất bại');
+      return null;
+    }
+  }
+
   Future<void> _onPlaceOrder() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedDeliveryId == null) {
+      Get.snackbar('Lỗi', 'Vui lòng chọn hình thức giao hàng');
+      return;
+    }
     if (_selectedPaymentId == null) {
       Get.snackbar('Lỗi', 'Vui lòng chọn phương thức thanh toán');
       return;
     }
 
     final subtotal = _calcSubtotal();
-    final total = subtotal - (subtotal * _discountPercent / 100) + AppConstants.shippingFee;
+    final total =
+        subtotal - (subtotal * _discountPercent / 100) + _selectedDeliveryFee;
 
     final orderItems = _cartController.cartItems
         .map((item) => {'bookId': item.bookId, 'quantity': item.quantity})
@@ -231,12 +455,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       totalPrice: total,
       paymentId: _selectedPaymentId!,
       paymentStatus: 'PENDING',
+      deliveryId: _selectedDeliveryId!,
       note: _noteCtrl.text.trim(),
       orderItems: orderItems,
     );
 
     if (order != null) {
-      // Đánh dấu coupon đã dùng nếu có (báo lỗi rõ, không nuốt lỗi).
+      _cartController.fetchCart();
+
+      final awaitingPayOS = _isPayOsSelected();
+      if (awaitingPayOS) {
+        final payos = await _createPayOSPayment(order);
+        if (payos == null) {
+          await _orderController.cancelOrder(order.idOrder);
+          return;
+        }
+        final qr = payos['qrCode'] as String? ?? '';
+        if (qr.isEmpty && (payos['checkoutUrl'] as String? ?? '').isEmpty) {
+          Get.snackbar('Lỗi', 'PayOS không trả mã QR');
+          await _orderController.cancelOrder(order.idOrder);
+          return;
+        }
+        final couponCode =
+            _couponCtrl.text.trim().isNotEmpty && _discountPercent > 0
+                ? _couponCtrl.text.trim()
+                : null;
+        Get.offNamed('/payos-payment', arguments: {
+          'orderId': order.idOrder,
+          'totalPrice': order.totalPrice,
+          'qrCode': qr,
+          'checkoutUrl': payos['checkoutUrl'],
+          'accountNumber': payos['accountNumber'],
+          'accountName': payos['accountName'],
+          'amount': payos['amount'] ?? order.totalPrice.round(),
+          'couponCode': couponCode,
+        });
+        return;
+      }
+
       if (_couponCtrl.text.trim().isNotEmpty && _discountPercent > 0) {
         try {
           await _dio.put(ApiEndpoints.couponUse,
@@ -245,11 +501,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Get.snackbar('Lưu ý', e.response?.data?['message'] ?? 'Không thể ghi nhận mã giảm giá');
         }
       }
-      _cartController.fetchCart();
-      // Dùng tổng server tính (order.totalPrice) cho màn xác nhận.
+
       Get.offNamed('/payment-success', arguments: {
         'orderId': order.idOrder,
         'totalPrice': order.totalPrice,
+        'awaitingPayOS': false,
       });
     } else {
       Get.snackbar('Lỗi', _orderController.errorMessage.value);

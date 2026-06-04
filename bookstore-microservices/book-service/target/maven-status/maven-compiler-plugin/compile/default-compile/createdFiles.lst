@@ -1,6 +1,7 @@
 com\bookstore\book\config\CloudinaryConfig.class
 com\bookstore\book\repository\BookRepository.class
 com\bookstore\book\service\BookService.class
+com\bookstore\book\dto\response\BookListDto.class
 com\bookstore\book\entity\Book$BookBuilder.class
 com\bookstore\book\entity\Genre.class
 com\bookstore\book\controller\GenreController.class
@@ -20,6 +21,7 @@ com\bookstore\book\entity\Review$ReviewBuilder.class
 com\bookstore\book\repository\GenreRepository.class
 com\bookstore\book\service\ReviewService.class
 com\bookstore\book\entity\FavoriteBook.class
+com\bookstore\book\dto\response\BookListDto$BookListDtoBuilder.class
 com\bookstore\book\entity\Review.class
 com\bookstore\book\entity\Image$ImageBuilder.class
 com\bookstore\book\service\CloudinaryService.class

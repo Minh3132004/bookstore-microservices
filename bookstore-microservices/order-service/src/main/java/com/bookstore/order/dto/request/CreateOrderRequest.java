@@ -14,6 +14,8 @@ public class CreateOrderRequest {
     private double totalPrice;
     private int paymentId;
     private String paymentStatus;
+    /** Phương thức giao hàng (bảng delivery). Mặc định 1 nếu không gửi. */
+    private int deliveryId;
     private List<OrderItemRequest> orderItems;
 
     @Data

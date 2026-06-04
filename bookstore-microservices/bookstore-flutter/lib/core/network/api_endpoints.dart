@@ -10,11 +10,9 @@ class ApiEndpoints {
   // ========================================================
 
   static String get baseUrl {
-    // Nếu đã cấu hình IP thủ công → dùng luôn
     if (_hostIp.isNotEmpty) {
       return 'http://$_hostIp:8080/api/v1';
     }
-    // Android emulator không dùng được localhost → phải dùng 10.0.2.2
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8080/api/v1';
     }
@@ -35,6 +33,7 @@ class ApiEndpoints {
 
   // Books
   static const String books = '/books';
+  static const String bookBestsellers = '/books/bestsellers';
   static const String bookSearch = '/books/search';
   static String bookById(int id) => '/books/$id';
   static String bookStock(int id) => '/books/$id/stock';
@@ -62,9 +61,13 @@ class ApiEndpoints {
   static String orderStatus(int id) => '/orders/$id/status';
   static String cancelOrder(int id) => '/orders/$id/cancel';
 
+  // Deliveries (order-service)
+  static const String deliveries = '/deliveries';
+
   // Payments
   static const String payments = '/payments';
   static const String createPayOSLink = '/payments/payos/create';
+  static String verifyPayOS(int orderCode) => '/payments/payos/verify/$orderCode';
 
   // Coupons
   static const String coupons = '/coupons';

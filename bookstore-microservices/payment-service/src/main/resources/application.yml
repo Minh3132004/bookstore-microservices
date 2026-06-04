@@ -19,6 +19,11 @@ payos:
   client-id: ${PAYOS_CLIENT_ID}
   api-key: ${PAYOS_API_KEY}
   checksum-key: ${PAYOS_CHECKSUM_KEY}
+  return-url: ${PAYOS_RETURN_URL:https://pay.payos.vn/web/}
+  cancel-url: ${PAYOS_CANCEL_URL:https://pay.payos.vn/web/}
+
+services:
+  order-url: ${SERVICES_ORDER_URL:http://localhost:8084}
 
 management:
   endpoints:

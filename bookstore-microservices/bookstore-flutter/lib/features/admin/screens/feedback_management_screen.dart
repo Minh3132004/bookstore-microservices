@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/admin_controller.dart';
+import '../widgets/admin_ui.dart';
 
 class FeedbackManagementScreen extends StatefulWidget {
   const FeedbackManagementScreen({super.key});
@@ -11,6 +12,8 @@ class FeedbackManagementScreen extends StatefulWidget {
 
 class _FeedbackManagementScreenState extends State<FeedbackManagementScreen> {
   final controller = Get.put(AdminController());
+  final _searchCtrl = TextEditingController();
+  String _keyword = '';
 
   @override
   void initState() {
@@ -19,25 +22,72 @@ class _FeedbackManagementScreenState extends State<FeedbackManagementScreen> {
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _keyword = value);
+    if (value.trim().isEmpty) {
+      controller.fetchFeedbacks(page: 0, size: 10);
+    } else {
+      controller.fetchFeedbacks(page: 0, size: 200);
+    }
+  }
+
+  List<dynamic> _filteredFeedbacks() {
+    if (_keyword.trim().isEmpty) return controller.feedbacks;
+    return controller.feedbacks.where((f) {
+      return adminMatchesKeyword(_keyword, [
+        f['content']?.toString(),
+        f['userId']?.toString(),
+        f['createdAt']?.toString(),
+      ]);
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final searching = _keyword.trim().isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: Obx(() => Text('Phản hồi (${controller.unreadFeedbackCount.value} chưa đọc)')),
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (controller.feedbacks.isEmpty) {
-          return const Center(child: Text('Chưa có phản hồi nào.'));
-        }
-        return Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                itemCount: controller.feedbacks.length,
+      body: Column(
+        children: [
+          AdminSearchBar(
+            controller: _searchCtrl,
+            hint: 'Tìm theo nội dung, user ID...',
+            onChanged: _onSearchChanged,
+          ),
+          Obx(() {
+            if (searching) {
+              return AdminFilterResultBar(count: _filteredFeedbacks().length);
+            }
+            return const SizedBox.shrink();
+          }),
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final items = _filteredFeedbacks();
+              if (items.isEmpty) {
+                return Center(
+                  child: Text(
+                    searching
+                        ? 'Không tìm thấy phản hồi với "$_keyword"'
+                        : 'Chưa có phản hồi nào.',
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: items.length,
                 itemBuilder: (ctx, i) {
-                  final f = controller.feedbacks[i];
+                  final f = items[i];
                   final isRead = f['read'] == true;
                   return Card(
                     color: isRead ? null : Colors.indigo.shade50,
@@ -66,12 +116,12 @@ class _FeedbackManagementScreenState extends State<FeedbackManagementScreen> {
                     ),
                   );
                 },
-              ),
-            ),
-            _Pagination(controller: controller),
-          ],
-        );
-      }),
+              );
+            }),
+          ),
+          if (!searching) _Pagination(controller: controller),
+        ],
+      ),
     );
   }
 }
