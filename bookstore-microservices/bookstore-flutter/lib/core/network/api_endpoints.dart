@@ -24,6 +24,7 @@ class ApiEndpoints {
   static const String login = '/auth/login';
   static const String activate = '/auth/activate';
   static const String forgotPassword = '/auth/forgot-password';
+  static const String changePassword = '/auth/change-password';
 
   // Users
   static const String users = '/users';

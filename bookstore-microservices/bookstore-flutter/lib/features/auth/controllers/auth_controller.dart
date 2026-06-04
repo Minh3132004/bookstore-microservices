@@ -66,6 +66,34 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final response = await _dio.put(
+        ApiEndpoints.changePassword,
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
+        },
+      );
+      final body = response.data;
+      if (body['success'] == true) return true;
+      errorMessage.value = body['message'] ?? 'Đổi mật khẩu thất bại!';
+      return false;
+    } on DioException catch (e) {
+      errorMessage.value = e.response?.data?['message'] ?? 'Lỗi kết nối!';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<bool> forgotPassword(String email) async {
     isLoading.value = true;
     errorMessage.value = '';

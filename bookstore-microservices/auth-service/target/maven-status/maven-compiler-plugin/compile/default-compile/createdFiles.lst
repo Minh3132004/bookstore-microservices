@@ -5,6 +5,7 @@ com\bookstore\auth\security\JwtService.class
 com\bookstore\auth\dto\request\ForgotPasswordRequest.class
 com\bookstore\auth\AuthServiceApplication.class
 com\bookstore\auth\service\EmailService.class
+com\bookstore\auth\dto\request\ChangePasswordRequest.class
 com\bookstore\auth\dto\response\ApiResponse.class
 com\bookstore\auth\entity\AuthUser.class
 com\bookstore\auth\repository\AuthUserRepository.class

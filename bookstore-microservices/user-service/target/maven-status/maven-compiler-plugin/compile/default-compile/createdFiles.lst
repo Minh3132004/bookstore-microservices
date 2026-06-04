@@ -12,6 +12,5 @@ com\bookstore\user\dto\response\UserResponse.class
 com\bookstore\user\util\Base64ToMultipartFile.class
 com\bookstore\user\dto\request\ChangeAvatarRequest.class
 com\bookstore\user\dto\response\ApiResponse.class
-com\bookstore\user\dto\request\ChangePasswordRequest.class
 com\bookstore\user\config\CloudinaryConfig.class
 com\bookstore\user\UserServiceApplication.class

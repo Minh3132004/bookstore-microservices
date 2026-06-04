@@ -5,6 +5,7 @@ import 'features/auth/controllers/auth_controller.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/auth/screens/forgot_password_screen.dart';
+import 'features/auth/screens/change_password_screen.dart';
 import 'features/auth/screens/active_account_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/books/screens/products_screen.dart';
@@ -57,6 +58,7 @@ class BookStoreApp extends StatelessWidget {
         GetPage(name: '/login', page: () => const LoginScreen()),
         GetPage(name: '/register', page: () => const RegisterScreen()),
         GetPage(name: '/forgot-password', page: () => const ForgotPasswordScreen()),
+        GetPage(name: '/change-password', page: () => const ChangePasswordScreen()),
         GetPage(name: '/active-account', page: () => const ActiveAccountScreen()),
         // Customer
         GetPage(name: '/home', page: () => const HomeScreen()),

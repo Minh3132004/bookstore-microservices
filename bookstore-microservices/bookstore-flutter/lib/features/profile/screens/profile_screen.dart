@@ -96,6 +96,12 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
+                onPressed: () => Get.toNamed('/change-password'),
+                icon: const Icon(Icons.lock),
+                label: const Text('Đổi mật khẩu'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
                 onPressed: () => Get.toNamed('/orders'),
                 icon: const Icon(Icons.receipt_long),
                 label: const Text('Đơn hàng của tôi'),

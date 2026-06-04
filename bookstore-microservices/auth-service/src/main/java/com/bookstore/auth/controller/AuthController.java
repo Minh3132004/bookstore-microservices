@@ -1,5 +1,6 @@
 package com.bookstore.auth.controller;
 
+import com.bookstore.auth.dto.request.ChangePasswordRequest;
 import com.bookstore.auth.dto.request.ForgotPasswordRequest;
 import com.bookstore.auth.dto.request.LoginRequest;
 import com.bookstore.auth.dto.request.RegisterRequest;
@@ -45,6 +46,14 @@ public class AuthController {
     @PutMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         ApiResponse<Void> response = authService.forgotPassword(request);
+        return response.isSuccess() ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @RequestHeader("X-User-Id") int userId,
+            @RequestBody ChangePasswordRequest request) {
+        ApiResponse<Void> response = authService.changePassword(userId, request);
         return response.isSuccess() ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
     }
 }

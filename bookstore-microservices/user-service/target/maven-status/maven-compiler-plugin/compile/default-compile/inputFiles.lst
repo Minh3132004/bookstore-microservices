@@ -1,7 +1,6 @@
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\config\CloudinaryConfig.java
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\controller\UserController.java
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\dto\request\ChangeAvatarRequest.java
-D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\dto\request\ChangePasswordRequest.java
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\dto\request\UpdateProfileRequest.java
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\dto\response\ApiResponse.java
 D:\bookstore-microservices\bookstore-microservices\user-service\src\main\java\com\bookstore\user\dto\response\UserResponse.java

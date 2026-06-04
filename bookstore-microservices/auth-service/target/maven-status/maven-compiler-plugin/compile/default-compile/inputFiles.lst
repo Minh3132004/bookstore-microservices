@@ -1,6 +1,7 @@
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\AuthServiceApplication.java
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\client\UserClient.java
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\controller\AuthController.java
+D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\dto\request\ChangePasswordRequest.java
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\dto\request\ForgotPasswordRequest.java
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\dto\request\LoginRequest.java
 D:\bookstore-microservices\bookstore-microservices\auth-service\src\main\java\com\bookstore\auth\dto\request\RegisterRequest.java

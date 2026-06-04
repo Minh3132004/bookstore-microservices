@@ -1,7 +1,6 @@
 package com.bookstore.user.service;
 
 import com.bookstore.user.dto.request.ChangeAvatarRequest;
-import com.bookstore.user.dto.request.ChangePasswordRequest;
 import com.bookstore.user.dto.request.UpdateProfileRequest;
 import com.bookstore.user.dto.response.ApiResponse;
 import com.bookstore.user.dto.response.UserResponse;
@@ -10,7 +9,6 @@ import com.bookstore.user.repository.UserRepository;
 import com.bookstore.user.util.Base64ToMultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 

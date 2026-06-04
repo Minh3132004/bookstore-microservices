@@ -1,6 +1,7 @@
 package com.bookstore.auth.service;
 
 import com.bookstore.auth.client.UserClient;
+import com.bookstore.auth.dto.request.ChangePasswordRequest;
 import com.bookstore.auth.dto.request.ForgotPasswordRequest;
 import com.bookstore.auth.dto.request.LoginRequest;
 import com.bookstore.auth.dto.request.RegisterRequest;
@@ -12,7 +13,6 @@ import com.bookstore.auth.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,7 +21,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -34,9 +33,6 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
     private final UserClient userClient;
-
-    @Value("${app.frontend-url}")
-    private String frontendUrl;
 
     public ApiResponse<Void> register(RegisterRequest request) {
         if (authUserRepository.existsByUsername(request.getUsername())) {
@@ -156,5 +152,35 @@ public class AuthService {
 
         emailService.sendForgotPasswordEmail(user.getEmail(), tempPassword);
         return ApiResponse.success("Mật khẩu tạm thời đã được gửi đến email của bạn.");
+    }
+
+    public ApiResponse<Void> changePassword(int userId, ChangePasswordRequest request) {
+        AuthUser user = authUserRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ApiResponse.error("Người dùng không tồn tại!");
+        }
+
+        if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
+            return ApiResponse.error("Mật khẩu hiện tại không được để trống!");
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+            return ApiResponse.error("Mật khẩu mới không được để trống!");
+        }
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            return ApiResponse.error("Mật khẩu hiện tại không đúng!");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            return ApiResponse.error("Mật khẩu mới và xác nhận mật khẩu không khớp!");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            return ApiResponse.error("Mật khẩu mới phải khác mật khẩu hiện tại!");
+        }
+        if (request.getNewPassword().length() < 8) {
+            return ApiResponse.error("Mật khẩu mới phải có ít nhất 8 ký tự!");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        authUserRepository.save(user);
+        return ApiResponse.success("Đổi mật khẩu thành công!");
     }
 }
